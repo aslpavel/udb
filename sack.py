@@ -2,7 +2,7 @@
 import io
 import struct
 
-from .alloc import *
+from .buddy import *
 
 __all__ = ('StreamSack',)
 #------------------------------------------------------------------------------#

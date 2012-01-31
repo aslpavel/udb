@@ -62,7 +62,7 @@ class BPTree (object):
             node.children.insert (index + 1, value)
             dirty (node)
 
-            if len (node.children) < order:
+            if len (node.keys) < order:
                 return
 
             # node is full so we need to split it
@@ -97,8 +97,7 @@ class BPTree (object):
 
     def Pop (self, key, default = null):
         # provider
-        order = self.provider.Order ()
-        half_order = (order >> 1) - 1
+        half_order = self.provider.Order () >> 1
         dirty = self.provider.Dirty
         desc2node = self.provider.DescToNode
 

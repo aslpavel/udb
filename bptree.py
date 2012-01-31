@@ -13,19 +13,52 @@ class BPTree (object):
         self.provider = provider
 
     def Get (self, key, default = null):
-        node = self.provider.Root ()
+        # provider
         desc2node = self.provider.DescToNode
+
+        # find leaf
+        node = self.provider.Root ()
         for depth in range (self.provider.Depth () - 1):
             node = desc2node (node.children [bisect (node.keys, key)])
+
+        # check key
         index = bisect (node.keys, key)
         if not index or node.keys [index - 1] != key:
             if default is null:
                 raise KeyError (key)
             return default
+
         return node.children [index]
 
-    def GetRange (self, begin = None, end = None):
-        return begin, end
+    def GetRange (self, low = None, high = None):
+        # validate range
+        if low is not None and high is not None and low >= high:
+            return
+
+        # find first leaf
+        desc2node = self.provider.DescToNode
+        node = self.provider.Root ()
+        if low is not None:
+            for depth in range (self.provider.Depth () - 1):
+                node = desc2node (node.children [bisect (node.keys, low)])
+            index = bisect (node.keys, low)
+        else:
+            for depth in range (self.provider.Depth () - 1):
+                node = desc2node (node.children [0])
+            index = 1
+
+        # iterate over whole leafs
+        while not high or node.keys [-1] < high:
+            for index in range (index, len (node.keys) + 1):
+                yield node.keys [index - 1], node.children [index]
+            node = node.children [-1]
+            if node is None:
+                return
+            index = 1
+
+        # iterate over last leaf
+        for index in range (index, bisect (node.keys, high) + 1):
+            yield node.keys [index - 1], node.children [index]
 
     def Add (self, key, value):
         # provider
@@ -128,6 +161,7 @@ class BPTree (object):
             del node.children [index]
 
             if len (node.keys) >= half_order:
+                dirty (node)
                 return value
 
             #------------------------------------------------------------------#
@@ -228,11 +262,17 @@ class BPTree (object):
 
         return value
 
+    #--------------------------------------------------------------------------#
+    # Mutable Map Interface                                                    #
+    #--------------------------------------------------------------------------#
+    def __iter__ (self):
+        pass
+
 #------------------------------------------------------------------------------#
 # B+Tree Node                                                                  #
 #------------------------------------------------------------------------------#
 class BPTreeNode (object):
-    __slots__ = ('keys', 'children', 'is_leaf')
+    __slots__ = ('keys', 'children', 'is_leaf',)
 
     def __init__ (self, keys, children, is_leaf):
         self.keys, self.children, self.is_leaf = keys, children, is_leaf

@@ -2,7 +2,7 @@
 import io
 import struct
 
-from .buddy import *
+from .alloc import *
 
 __all__ = ('StreamSack',)
 #------------------------------------------------------------------------------#
@@ -11,7 +11,7 @@ __all__ = ('StreamSack',)
 class StreamSack (object):
     """Stream Sack
 
-    Container which is capable storing data of arbitrary size in a stream
+    Container which is capable storing data of arbitrary size in seekable a stream
     """
     def __init__ (self, stream, offset, new = False):
         self.stream = stream

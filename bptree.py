@@ -6,10 +6,9 @@ from operator import itemgetter
 if sys.version_info [0] < 3:
     from itertools import imap as map
 
-__all__ = ('BPTree', 'BPTreeNode',
-   'BPTreeProvider', 'BPTreeSimpleProvider')
-
+__all__ = ('BPTree', 'BPTreeNode', 'BPTreeLeaf')
 null = object ()
+
 #------------------------------------------------------------------------------#
 # B+Tree                                                                       #
 #------------------------------------------------------------------------------#
@@ -402,78 +401,4 @@ class BPTreeLeaf (BPTreeNode):
         BPTreeNode.__init__ (self, keys, children, is_leaf = True)
         self.next, self.prev = None, None
 
-#------------------------------------------------------------------------------#
-# B+Tree Provider                                                              #
-#------------------------------------------------------------------------------#
-class BPTreeProvider (object):
-    # transformation
-    def NodeToDesc (self, node):
-        raise NotImplementedError ()
-
-    def DescToNode (self, desc):
-        raise NotImplementedError ()
-
-    # creation | deletion
-    def Dirty (self, node):
-        raise NotImplementedError ()
-
-    def Release (self, node):
-        raise NotImplementedError ()
-
-    def NodeCreate (self, keys, children, is_leaf):
-        raise NotImplementedError ()
-
-    # properties
-    def Size (self, value = None):
-        raise NotImplementedError ()
-
-    def Depth (self, value = None):
-        raise NotImplementedError ()
-
-    def Root (self, value = None):
-        raise NotImplementedError ()
-
-    def Order (self):
-        pass
-
-#------------------------------------------------------------------------------#
-# B+Tree Simple Provider                                                       #
-#------------------------------------------------------------------------------#
-class BPTreeSimpleProvider (BPTreeProvider):
-    def __init__ (self, order):
-        self.root = self.NodeCreate ([], [], True)
-        self.size  = 0
-        self.depth = 1
-        self.order = order
-
-    def NodeToDesc (self, node):
-        return node
-
-    def DescToNode (self, desc):
-        return desc
-
-    def Dirty (self, node):
-        pass
-
-    def Release (self, node):
-        pass
-
-    def NodeCreate (self, keys, children, is_leaf):
-        return (BPTreeLeaf (keys, children) if is_leaf
-            else BPTreeNode (keys, children))
-
-    def Size (self, value = None):
-        self.size = self.size if value is None else value
-        return self.size
-
-    def Depth (self, value = None):
-        self.depth = self.depth if value is None else value
-        return self.depth
-
-    def Root (self, value = None):
-        self.root = self.root if value is None else value
-        return self.root
-
-    def Order (self):
-        return self.order
 # vim: nu ft=python columns=120 :

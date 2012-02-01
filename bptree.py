@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-from bisect import bisect
+from bisect import bisect, bisect_left
 
 __all__ = ('BPTree', 'BPTreeNode',
    'BPTreeProvider', 'BPTreeSimpleProvider')
@@ -23,7 +23,7 @@ class BPTree (object):
 
         # check key
         index = bisect (node.keys, key)
-        if not index or node.keys [index - 1] != key:
+        if index >= len (node.keys) or node.keys [index] != key:
             if default is null:
                 raise KeyError (key)
             return default
@@ -41,24 +41,29 @@ class BPTree (object):
         if low is not None:
             for depth in range (self.provider.Depth () - 1):
                 node = desc2node (node.children [bisect (node.keys, low)])
-            index = bisect (node.keys, low)
+            index = bisect_left (node.keys, low)
+            if index >= len (node.keys):
+                node, index = desc2node (node.next), 0
         else:
             for depth in range (self.provider.Depth () - 1):
                 node = desc2node (node.children [0])
-            index = 1
+            index = 0
 
         # iterate over whole leafs
         while not high or node.keys [-1] < high:
-            for index in range (index, len (node.keys) + 1):
-                yield node.keys [index - 1], node.children [index]
-            node = node.children [-1]
+            for index in range (index, len (node.keys)):
+                yield node.keys [index], node.children [index]
+            node = desc2node (node.next)
             if node is None:
                 return
-            index = 1
+            index = 0
 
         # iterate over last leaf
-        for index in range (index, bisect (node.keys, high) + 1):
-            yield node.keys [index - 1], node.children [index]
+        for index in range (index, len (node.keys)):
+            key, value = node.keys [index], node.children [index]
+            if key > high:
+                return
+            yield key, value
 
     def Add (self, key, value):
         # provider
@@ -71,16 +76,16 @@ class BPTree (object):
         node, path = self.provider.Root (), []
         for depth in range (self.provider.Depth () - 1):
             index = bisect (node.keys, key)
-            path.append ((index, node))
+            path.append ((index, index + 1, node))
             node = desc2node (node.children [index])
 
         # check if value is updated
-        index = bisect (node.keys, key)
-        if index and key == node.keys [index - 1]:
+        index = bisect_left (node.keys, key)
+        if index < len (node.keys) and key == node.keys [index]:
             node.children [index] = value
             dirty (node)
             return
-        path.append ((index, node))
+        path.append ((index, index, node))
 
         # size += 1
         self.provider.Size (self.provider.Size () + 1)
@@ -88,11 +93,11 @@ class BPTree (object):
         # update tree
         sibling = None
         while path:
-            index, node = path.pop ()
+            key_index, child_index, node = path.pop ()
 
             # add new key
-            node.keys.insert (index, key)
-            node.children.insert (index + 1, value)
+            node.keys.insert (key_index, key)
+            node.children.insert (child_index, value)
             dirty (node)
 
             if len (node.keys) < order:
@@ -101,27 +106,30 @@ class BPTree (object):
             # node is full so we need to split it
             center = len (node.children) >> 1
             if node.is_leaf:
-                # create sibling
-                sibling = self.provider.NodeCreate (node.keys [center - 1:], node.children [center:], True)
-                node.keys, node.children = node.keys [:center - 1], node.children [:center]
+                # create right sibling
+                sibling = self.provider.NodeCreate (node.keys [center:], node.children [center:], True)
+                node.keys, node.children = node.keys [:center], node.children [:center]
 
                 # keep leafs linked
-                node.children.append (node2desc (sibling))
-                sibling.children.insert (0, node2desc (node))
+                sibling_desc, node_next_desc = node2desc (sibling), node.next
+                node.next, sibling.prev = sibling_desc, node2desc (node)
+                if node_next_desc:
+                    node_next = desc2node (node_next_desc)
+                    node_next.prev, sibling.next = sibling_desc, node_next_desc
+                    dirty (node_next)
 
                 # update key
-                key = sibling.keys [0]
+                key, value = sibling.keys [0], node.next
 
             else:
-                # create sibling
+                # create right sibling
                 sibling = self.provider.NodeCreate (node.keys [center:], node.children [center:], False)
                 node.keys, node.children = node.keys [:center], node.children [:center]
 
                 # update key
-                key = node.keys.pop ()
+                key, value = node.keys.pop (), node2desc (sibling)
 
             dirty (sibling)
-            value = node2desc (sibling)
 
         # create new root
         self.provider.Depth (self.provider.Depth () + 1) # depth += 1
@@ -142,12 +150,13 @@ class BPTree (object):
             path.append ((node, index, parent))
 
         # check if key exists
-        index = bisect (node.keys, key)
-        if not index and node.keys [index - 1] != key:
+        index = bisect_left (node.keys, key)
+        if index < len (node.keys) and key != node.keys [index]:
             if default is null:
                 raise KeyError (key)
             return default
         value = node.children [index]
+        key_index, child_index = index, index
 
         # size -= 1
         self.provider.Size (self.provider.Size () - 1)
@@ -157,8 +166,8 @@ class BPTree (object):
             node, node_index, parent = path.pop ()
 
             # remove scheduled (key | child)
-            del node.keys [index - 1]
-            del node.children [index]
+            del node.keys [key_index]
+            del node.children [child_index]
 
             if len (node.keys) >= half_order:
                 dirty (node)
@@ -171,22 +180,14 @@ class BPTree (object):
             if node_index > 0:
                 # has left sibling
                 left = desc2node (parent.children [node_index - 1])
-                if len (left.keys) > half_order:
-                    # borrow from left sibling
-                    if node.is_leaf:
-                        # copy left key
-                        parent.keys [node_index - 1] = left.keys [-1]
-                        # move left key to node
-                        node.keys.insert (0, left.keys.pop ())
-                        # move left child to node (don't forget about leaf links)
-                        node.children.insert (1, left.children.pop (-2))
-                    else:
-                        # copy parent's key to node
-                        node.keys.insert (0, parent.keys [node_index - 1])
-                        # move left key to parent
-                        parent.keys [node_index - 1] = left.keys.pop ()
-                        # move left child to node
-                        node.children.insert (0, left.children.pop ())
+                if len (left.keys) > half_order: # borrow from left sibling
+                    # copy correct key to node
+                    node.keys.insert (0, left.keys [-1] if node.is_leaf
+                        else parent.keys [node_index - 1])
+                    # move left key to parent
+                    parent.keys [node_index - 1] = left.keys.pop ()
+                    # move left child to node
+                    node.children.insert (0, left.children.pop ())
 
                     dirty (node), dirty (left), dirty (parent)
                     return value
@@ -194,22 +195,19 @@ class BPTree (object):
             if node_index < len (parent.keys):
                 # has right sibling
                 right = desc2node (parent.children [node_index + 1])
-                if len (right.keys) > half_order:
-                    # borrow from right sibling
+                if len (right.keys) > half_order: # borrow from right sibling
                     if node.is_leaf:
-                        # copy right key
-                        parent.keys [node_index] = right.keys [1]
                         # move right key to node
                         node.keys.append (right.keys.pop (0))
-                        # move right child to node (don't forget about leaf links)
-                        node.children.insert (-1, right.children.pop (1))
+                        # copy next right key to parent
+                        parent.keys [node_index] = right.keys [0]
                     else:
-                        # copy parent's key to node
+                        # copy correct key to node
                         node.keys.append (parent.keys [node_index])
                         # move right key to parent
                         parent.keys [node_index] = right.keys.pop (0)
-                        # move right child to node
-                        node.children.append (right.children.pop (0))
+                    # move right child to node
+                    node.children.append (right.children.pop (0))
 
                     dirty (node), dirty (right), dirty (parent)
                     return value
@@ -217,23 +215,19 @@ class BPTree (object):
             #------------------------------------------------------------------#
             # Merge                                                            #
             #------------------------------------------------------------------#
-            src, dst, index = ((node, left, node_index) if left
+            src, dst, child_index = ((node, left, node_index) if left
                 else (right, node, node_index + 1))
 
             if node.is_leaf:
-                # remove dst from chain of leafs
-                dst.children.pop ()
-                dst_desc = src.children.pop (0)
-
-                # update next if src isn't the last leaf
-                src_next_desc = src.children [-1]
-                if src_next_desc is not None:
-                    src_next = desc2node (src_next_desc)
-                    src_next.children [0] = dst_desc
+                # keep leafs linked
+                dst.next = src.next
+                if src.next is not None:
+                    src_next = desc2node (src.next)
+                    src_next.prev = src.prev
                     dirty (src_next)
             else:
                 # copy parents key
-                dst.keys.append (parent.keys [index - 1])
+                dst.keys.append (parent.keys [child_index - 1])
 
             # copy node's (keys | children)
             dst.keys.extend (src.keys)
@@ -243,12 +237,15 @@ class BPTree (object):
             self.provider.Release (src)
             dirty (dst)
 
+            # update key index
+            key_index = child_index - 1
+
         #----------------------------------------------------------------------#
         # Update Root                                                          #
         #----------------------------------------------------------------------#
         root = self.provider.Root ()
-        del root.keys [index - 1]
-        del root.children [index]
+        del root.keys [key_index]
+        del root.children [child_index]
 
         if not root.keys:
             depth = self.provider.Depth ()
@@ -274,9 +271,15 @@ class BPTree (object):
 class BPTreeNode (object):
     __slots__ = ('keys', 'children', 'is_leaf',)
 
-    def __init__ (self, keys, children, is_leaf):
+    def __init__ (self, keys, children, is_leaf = False):
         self.keys, self.children, self.is_leaf = keys, children, is_leaf
 
+class BPTreeLeaf (BPTreeNode):
+    __slots__ = ('keys', 'children', 'is_leaf', 'next', 'prev')
+
+    def __init__ (self, keys, children):
+        BPTreeNode.__init__ (self, keys, children, is_leaf = True)
+        self.next, self.prev = None, None
 #------------------------------------------------------------------------------#
 # B+Tree Provider                                                              #
 #------------------------------------------------------------------------------#
@@ -316,7 +319,7 @@ class BPTreeProvider (object):
 #------------------------------------------------------------------------------#
 class BPTreeSimpleProvider (BPTreeProvider):
     def __init__ (self, order):
-        self.root = self.NodeCreate ([], [None, None], True)
+        self.root = self.NodeCreate ([], [], True)
         self.size  = 0
         self.depth = 1
         self.order = order
@@ -334,7 +337,8 @@ class BPTreeSimpleProvider (BPTreeProvider):
         pass
 
     def NodeCreate (self, keys, children, is_leaf):
-        return BPTreeNode (keys, children, is_leaf)
+        return (BPTreeLeaf (keys, children) if is_leaf
+            else BPTreeNode (keys, children))
 
     def Size (self, value = None):
         self.size = self.size if value is None else value

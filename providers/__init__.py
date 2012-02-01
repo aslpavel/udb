@@ -1,10 +1,10 @@
 # -*- coding: utf-8 -*-
 
-__all__ = ('BPTreeProvider',)
+__all__ = ('Provider',)
 #------------------------------------------------------------------------------#
 # B+Tree Provider                                                              #
 #------------------------------------------------------------------------------#
-class BPTreeProvider (object):
+class Provider (object):
     # transformation
     def NodeToDesc (self, node):
         raise NotImplementedError ()

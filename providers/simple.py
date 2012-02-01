@@ -1,12 +1,12 @@
 # -*- coding: utf-8 -*-
-from . import *
-from ..bptree import *
+from . import Provider
+from ..bptree import BPTreeNode, BPTreeLeaf
 
-__all__ = ('BPTreeSimpleProvider',)
+__all__ = ('SimpleProvider',)
 #------------------------------------------------------------------------------#
 # B+Tree Simple Provider                                                       #
 #------------------------------------------------------------------------------#
-class BPTreeSimpleProvider (BPTreeProvider):
+class SimpleProvider (Provider):
     def __init__ (self, order):
         self.root = self.NodeCreate ([], [], True)
         self.size  = 0

@@ -1,5 +1,10 @@
 # -*- coding: utf-8 -*-
+import sys
 from bisect import bisect, bisect_left
+from collections import MutableMapping
+from operator import itemgetter
+if sys.version_info [0] < 3:
+    from itertools import imap as map
 
 __all__ = ('BPTree', 'BPTreeNode',
    'BPTreeProvider', 'BPTreeSimpleProvider')
@@ -8,7 +13,7 @@ null = object ()
 #------------------------------------------------------------------------------#
 # B+Tree                                                                       #
 #------------------------------------------------------------------------------#
-class BPTree (object):
+class BPTree (MutableMapping):
     def __init__ (self, provider):
         self.provider = provider
 
@@ -22,13 +27,21 @@ class BPTree (object):
             node = desc2node (node.children [bisect (node.keys, key)])
 
         # check key
-        index = bisect (node.keys, key)
-        if index >= len (node.keys) or node.keys [index] != key:
+        index = bisect_left (node.keys, key)
+        if index >= len (node.keys) or key != node.keys [index]:
             if default is null:
                 raise KeyError (key)
             return default
 
         return node.children [index]
+
+    def GetCursor (self, key):
+        desc2node = self.provider.DescToNode
+        node = self.provider.Root ()
+        for depth in range (self.provider.Depth () - 1):
+            node = desc2node (node.children [bisect (node.keys, key)])
+
+        return BPTreeCursor (self.provider, node, bisect_left (node.keys, key) - 1)
 
     def GetRange (self, low = None, high = None):
         # validate range
@@ -43,6 +56,8 @@ class BPTree (object):
                 node = desc2node (node.children [bisect (node.keys, low)])
             index = bisect_left (node.keys, low)
             if index >= len (node.keys):
+                if node.next is None:
+                    return
                 node, index = desc2node (node.next), 0
         else:
             for depth in range (self.provider.Depth () - 1):
@@ -151,7 +166,7 @@ class BPTree (object):
 
         # check if key exists
         index = bisect_left (node.keys, key)
-        if index < len (node.keys) and key != node.keys [index]:
+        if index >= len (node.keys) or key != node.keys [index]:
             if default is null:
                 raise KeyError (key)
             return default
@@ -262,8 +277,114 @@ class BPTree (object):
     #--------------------------------------------------------------------------#
     # Mutable Map Interface                                                    #
     #--------------------------------------------------------------------------#
+    def __len__ (self):
+        return self.provider.Size ()
+
+    def __getitem__ (self, key):
+        if isinstance (key, slice):
+            return self.GetRange (low = key.start, high = key.stop)
+        return self.Get (key)
+
+    def __setitem__ (self, key, value):
+        return self.Add (key, value)
+
+    def __delitem__ (self, key):
+        return self.Pop (key)
+
     def __iter__ (self):
-        pass
+        return map (itemgetter (0), self.GetRange ())
+
+    def __contains__ (self, key):
+        return self.Get (key, default = None) is not None
+
+    def get (self, key, default = None):
+        return self.Get (key, default)
+
+    def pop (self, key, default = None):
+        return self.Pop (key, default)
+
+    def items (self):
+        return self.GetRange ()
+
+    def values (self):
+        return map (itemgetter (1), self.GetRange ())
+
+#------------------------------------------------------------------------------#
+# B+Tree Cursor                                                                #
+#------------------------------------------------------------------------------#
+class BPTreeCursor (object):
+    __slots__ = ('leaf', 'index', 'completed', 'provider')
+
+    def __init__ (self, provider, leaf, index):
+        self.leaf = leaf
+        self.index = index
+        self.provider = provider
+        self.completed = False
+
+    def __iter__ (self):
+        return self
+
+    def __next__ (self):
+        if self.completed:
+            raise StopIteration ()
+
+        leaf = self.leaf
+        if len (leaf.keys) > self.index + 1:
+            self.index += 1
+            return leaf.keys [self.index], leaf.children [self.index]
+
+        if leaf.next is None:
+            self.completed = True
+            raise StopIteration ()
+
+        self.leaf = self.provider.DescToNode (leaf.next)
+        self.index = 0
+        return self.__next__ ()
+
+    def next (self):
+        return self.__next__ ()
+
+    def __reversed__ (self):
+        return BPTreeReversedCursor (self.provider, self.leaf, self.index + 1)
+
+    def __invert__ (self):
+        return self.__reversed__ ()
+
+    @property
+    def Value (self):
+        return self.leaf.children [self.index]
+
+    @Value.setter
+    def Value (self, value):
+        self.leaf.children [self.index] = value
+        self.provider.Dirty (self.leaf)
+
+    @property
+    def Key (self):
+        return self.leaf.keys [self.index]
+
+class BPTreeReversedCursor (BPTreeCursor):
+    __slots__ = ('leaf', 'index', 'completed', 'provider')
+
+    def __next__ (self):
+        if self.completed:
+            raise StopIteration ()
+
+        leaf = self.leaf
+        if self.index > 0:
+            self.index -= 1
+            return leaf.keys [self.index], leaf.children [self.index]
+
+        if leaf.prev is None:
+            self.completed = True
+            raise StopIteration ()
+
+        self.leaf = self.provider.DescToNode (leaf.prev)
+        self.index = len (self.leaf.keys)
+        return self.__next__ ()
+
+    def __reversed__ (self):
+        return BPTreeCursor (self.provider, self.leaf, self.index - 1)
 
 #------------------------------------------------------------------------------#
 # B+Tree Node                                                                  #
@@ -280,6 +401,7 @@ class BPTreeLeaf (BPTreeNode):
     def __init__ (self, keys, children):
         BPTreeNode.__init__ (self, keys, children, is_leaf = True)
         self.next, self.prev = None, None
+
 #------------------------------------------------------------------------------#
 # B+Tree Provider                                                              #
 #------------------------------------------------------------------------------#

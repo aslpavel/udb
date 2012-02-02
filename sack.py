@@ -13,7 +13,7 @@ class Sack (object):
 
     Container which is capable storing data of arbitrary size in seekable a stream
     """
-    def __init__ (self, stream, offset, new = False):
+    def __init__ (self, stream, offset = 0, new = False):
         self.stream = stream
         self.offset = offset + SackDesc.size
         self.header = struct.Struct ('I')
@@ -25,7 +25,7 @@ class Sack (object):
             self.alloc = BuddyAllocator.Restore (io.BytesIO (self.Get (self.alloc_desc)))
 
     @staticmethod
-    def Create (stream, offset, order):
+    def Create (stream, order, offset = 0):
         sack = Sack (stream, offset, new = True)
         sack.alloc, sack.alloc_desc = BuddyAllocator (order), None
         return sack

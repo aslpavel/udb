@@ -12,16 +12,22 @@ class Sack (object):
     """Sack
 
     Container which is capable storing data of arbitrary size in seekable a stream
+    and associate it with unique descriptor
+    Descriptor Format:
+        0        7       8
+        +--------+-------+
+        | offset | order |
+        +--------+-------+
     """
     def __init__ (self, stream, offset = 0, new = False):
         self.stream = stream
-        self.offset = offset + SackDesc.size
+        self.offset = offset + 8 # desc.size
         self.header = struct.Struct ('I')
 
         if not new:
             # find allocator dump
             stream.seek (offset)
-            self.alloc_desc = SackDesc.FromStream (stream)
+            self.alloc_desc = struct.unpack ('Q', stream.read (8)) [0] # desc.from_stream
             self.alloc = BuddyAllocator.Restore (io.BytesIO (self.Get (self.alloc_desc)))
 
     @staticmethod
@@ -39,12 +45,12 @@ class Sack (object):
         """
         # try to save in previous location
         if desc is not None:
-            if len (data) + self.header.size  <= desc.Capacity:
-                self.stream.seek (self.offset + desc.Offset)
+            if len (data) + self.header.size  <= 1 << (desc & 0xff): # desc.capacity
+                self.stream.seek (self.offset + (desc >> 8)) # desc.offset
                 self.stream.write (self.header.pack (len (data)))
                 self.stream.write (data)
                 return desc
-            self.alloc.Free (desc.Offset, desc.Order)
+            self.alloc.Free (desc >> 8, desc & 0xff) # desc.offset, desc.order
 
         # allocate new block
         offset, order = self.alloc.Alloc (len (data) + self.header.size)
@@ -53,7 +59,7 @@ class Sack (object):
             self.stream.write (self.header.pack (len (data)))
             self.stream.write (data)
 
-            return SackDesc (offset, order)
+            return order | offset << 8 # desc
         except Exception:
             self.alloc.Free (offset, order)
             raise
@@ -64,10 +70,11 @@ class Sack (object):
         size: size of a space to be allocated
         returns: space descriptor
         """
-        if desc and size + self.header.size <= desc.Capacity:
+        if desc and size + self.header.size <= ():
             return desc
 
-        return SackDesc (*self.alloc.Alloc (size + self.header.size))
+        offset, order = self.alloc.Alloc (size + self.header.size)
+        return order | offset << 8 # desc
 
     def Get (self, desc):
         """Get data
@@ -75,7 +82,7 @@ class Sack (object):
         desc: data's descriptor
         returns: data
         """
-        self.stream.seek (self.offset + desc.Offset)
+        self.stream.seek (self.offset + (desc >> 8)) # desc.offset
         return self.stream.read (self.header.unpack (self.stream.read (self.header.size)) [0])
 
     def Pop (self, desc):
@@ -84,9 +91,10 @@ class Sack (object):
         desc: data's descriptor
         returns: data
         """
-        self.stream.seek (self.offset + desc.Offset)
+        offset, order = desc >> 8, desc & 0xff
+        self.stream.seek (self.offset + offset)
         size =  self.header.unpack (self.stream.read (self.header.size)) [0]
-        self.alloc.Free (desc.Offset, desc.Order)
+        self.alloc.Free (offset, order)
         return self.stream.read (size)
 
     def Flush (self):
@@ -101,8 +109,8 @@ class Sack (object):
             self.alloc_desc = desc
 
         # flush allocator's desc
-        self.stream.seek (self.offset - SackDesc.size)
-        self.stream.write (self.alloc_desc.ToBytes ())
+        self.stream.seek (self.offset - 8) # desc.size
+        self.stream.write (struct.pack ('Q', self.alloc_desc))
 
     # context manager
     def __enter__ (self):
@@ -112,45 +120,5 @@ class Sack (object):
         if et is None:
             self.Flush ()
         return False
-
-#------------------------------------------------------------------------------#
-# Sack Data Descriptor                                                         #
-#------------------------------------------------------------------------------#
-class SackDesc (tuple):
-    __slots__ = []
-    size = struct.calcsize ('QB')
-
-    def __new__ (cls, offset, uid):
-        return tuple.__new__ (cls, (offset, uid))
-
-    # properties
-    @property
-    def Offset (self):
-        return self [0]
-
-    @property
-    def Order (self):
-        return self [1]
-
-    @property
-    def Capacity (self):
-        return 1 << self [1]
-
-    # save restore
-    def ToBytes (self):
-        return struct.pack ('QB', *self)
-
-    @classmethod
-    def FromBytes (cls, data):
-        return cls (*struct.unpack_from ('QB', data))
-
-    @staticmethod
-    def FromStream (stream):
-        return SackDesc.FromBytes (stream.read (struct.calcsize ('QB')))
-
-    # repr
-    def __str__ (self):
-        return '|{0}, {1}|'.format (*self)
-    __repr__ = __str__
 
 # vim: nu ft=python columns=120 :

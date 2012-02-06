@@ -128,13 +128,13 @@ class BPTree (MutableMapping):
                 # keep leafs linked
                 sibling_desc, node_next_desc = node2desc (sibling), node.next
                 node.next, sibling.prev = sibling_desc, node2desc (node)
-                if node_next_desc:
-                    node_next = desc2node (node_next_desc)
+                node_next = desc2node (node_next_desc)
+                if node_next:
                     node_next.prev, sibling.next = sibling_desc, node_next_desc
                     dirty (node_next)
 
                 # update key
-                key, value = sibling.keys [0], node.next
+                key, value = sibling.keys [0], sibling_desc
 
             else:
                 # create right sibling

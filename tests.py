@@ -41,25 +41,44 @@ from random import shuffle
 
 class BPTreeTest (unittest.TestCase):
     def test_Compare (self):
-        tree, std = BPTree (SimpleProvider (order = 7)), {}
+        provider = self.provider ()
+        tree, std = BPTree (provider), {}
 
-        def validate ():
+        # compare tree and map mappings
+        def validate (tree):
             self.assertEqual (len (tree), len (std))
             for k, v in tree.items ():
                 self.assertEqual (std.get (k), v)
             for k, v in std.items ():
                 self.assertEqual (tree.get (k), v)
 
+        # item count
         count = 1 << 10
 
-        # Insertion
+        # reload
+        provider = self.provider (provider)
+        tree = BPTree (provider)
+        validate (tree)
+
+        # Insertion (10 .. 1024)
         for i in range (10, count):
             tree [i], std [i] = str (i), str (i)
-        validate ()
+        validate (tree)
 
+        # reload
+        provider = self.provider (provider)
+        tree = BPTree (provider)
+        validate (tree)
+
+        # Insert (0 .. 10)
         for i in range (0, 10):
             tree [i], std [i] = str (i), str (i)
-        validate ()
+        validate (tree)
+
+        # reload
+        provider = self.provider (provider)
+        tree = BPTree (provider)
+        validate (tree)
 
         # Range
         self.assertEqual (list (tree [100:201]), [(key, str (key)) for key in range (100, 202)])
@@ -68,15 +87,39 @@ class BPTreeTest (unittest.TestCase):
 
         # Deletion
         keys = list (range (count))
-        half = int (len (keys) / 2)
+        half = len (keys) >> 1
         shuffle (keys)
         for i in keys [:half]:
             self.assertEqual (tree.pop (i), std.pop (i))
-        validate ()
+        validate (tree)
+
+        # reload
+        provider = self.provider (provider)
+        tree = BPTree (provider)
+        validate (tree)
 
         for i in keys [half:]:
             self.assertEqual (tree.pop (i), std.pop (i))
         self.assertEqual (len (tree), 0)
-        validate ()
+        validate (tree)
+
+    def provider (self, source = None):
+        if source is None:
+            return SimpleProvider (order = 7)
+        return source
+
+#------------------------------------------------------------------------------#
+# B+Tree with Sack Provider                                                    #
+#------------------------------------------------------------------------------#
+import io
+from .sack import *
+from .providers.sack import *
+
+class BPTreeSackTest (BPTreeTest):
+    def provider (self, source = None):
+        if source is None:
+            return SackProvider.Create (Sack.Create (io.BytesIO (), 32), 7)
+        source.Flush ()
+        return SackProvider (source.sack, source.desc)
 
 # vim: nu ft=python columns=120 :

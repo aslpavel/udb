@@ -55,9 +55,10 @@ class BPTree (MutableMapping):
                 node = desc2node (node.children [bisect (node.keys, low)])
             index = bisect_left (node.keys, low)
             if index >= len (node.keys):
-                if node.next is None:
+                next = desc2node (node.next)
+                if next is None:
                     return
-                node, index = desc2node (node.next), 0
+                node, index = next, 0
         else:
             for depth in range (self.provider.Depth () - 1):
                 node = desc2node (node.children [0])
@@ -235,8 +236,8 @@ class BPTree (MutableMapping):
             if node.is_leaf:
                 # keep leafs linked
                 dst.next = src.next
-                if src.next is not None:
-                    src_next = desc2node (src.next)
+                src_next = desc2node (src.next)
+                if src_next is not None:
                     src_next.prev = src.prev
                     dirty (src_next)
             else:
@@ -332,12 +333,12 @@ class BPTreeCursor (object):
             self.index += 1
             return leaf.keys [self.index], leaf.children [self.index]
 
-        if leaf.next is None:
+        next = self.provider.DescToNode (leaf.next)
+        if next is None:
             self.completed = True
             raise StopIteration ()
 
-        self.leaf = self.provider.DescToNode (leaf.next)
-        self.index = 0
+        self.leaf, self.index = next, 0
         return self.__next__ ()
 
     def next (self):
@@ -374,12 +375,12 @@ class BPTreeReversedCursor (BPTreeCursor):
             self.index -= 1
             return leaf.keys [self.index], leaf.children [self.index]
 
-        if leaf.prev is None:
+        next = self.provider.DescToNode (leaf.prev)
+        if next is None:
             self.completed = True
             raise StopIteration ()
 
-        self.leaf = self.provider.DescToNode (leaf.prev)
-        self.index = len (self.leaf.keys)
+        self.leaf, self.index = next, len (self.leaf.keys)
         return self.__next__ ()
 
     def __reversed__ (self):

@@ -70,8 +70,10 @@ class Sack (object):
         size: size of a space to be allocated
         returns: space descriptor
         """
-        if desc and size + self.header.size <= ():
-            return desc
+        if desc:
+            if size + self.header.size <= 1 << (desc & 0xff): # desc.capacity
+                return desc
+            self.alloc.Free (desc >> 8, desc & 0xff)
 
         offset, order = self.alloc.Alloc (size + self.header.size)
         return order | offset << 8 # desc

@@ -65,6 +65,7 @@ class SackProvider (Provider):
         provider.order, provider.depth, provider.size = order, 1, 0
         provider.pickle_version = pickle.HIGHEST_PROTOCOL
         provider.root = provider.NodeCreate ([], [], True)
+        provider.desc = sack.Reserve (provider.header.size)
         provider.Flush ()
 
         return provider
@@ -209,7 +210,7 @@ class SackProvider (Provider):
         # Flush Header                                                             #
         #--------------------------------------------------------------------------#
         header = self.header.pack (self.order, self.depth, self.size, self.root.desc, self.pickle_version)
-        self.desc = self.sack.Push (header)
+        self.sack.Push (header, self.desc)
 
         #--------------------------------------------------------------------------#
         # Flush Sack                                                               #

@@ -21,7 +21,8 @@ class Sack (object):
     """
     def __init__ (self, stream, offset = 0, new = False):
         self.stream = stream
-        self.offset = offset + 8 # desc.size
+        self.offset = offset
+        self.data_offset = offset + 8 # desc.size
         self.header = struct.Struct ('I')
 
         if not new:
@@ -46,7 +47,7 @@ class Sack (object):
         # try to save in previous location
         if desc is not None:
             if len (data) + self.header.size  <= 1 << (desc & 0xff): # desc.capacity
-                self.stream.seek (self.offset + (desc >> 8)) # desc.offset
+                self.stream.seek (self.data_offset + (desc >> 8)) # desc.offset
                 self.stream.write (self.header.pack (len (data)))
                 self.stream.write (data)
                 return desc
@@ -55,7 +56,7 @@ class Sack (object):
         # allocate new block
         offset, order = self.alloc.Alloc (len (data) + self.header.size)
         try:
-            self.stream.seek (self.offset + offset)
+            self.stream.seek (self.data_offset + offset)
             self.stream.write (self.header.pack (len (data)))
             self.stream.write (data)
 
@@ -84,7 +85,7 @@ class Sack (object):
         desc: data's descriptor
         returns: data
         """
-        self.stream.seek (self.offset + (desc >> 8)) # desc.offset
+        self.stream.seek (self.data_offset + (desc >> 8)) # desc.offset
         return self.stream.read (self.header.unpack (self.stream.read (self.header.size)) [0])
 
     def Pop (self, desc):
@@ -94,7 +95,7 @@ class Sack (object):
         returns: data
         """
         offset, order = desc >> 8, desc & 0xff
-        self.stream.seek (self.offset + offset)
+        self.stream.seek (self.data_offset + offset)
         size =  self.header.unpack (self.stream.read (self.header.size)) [0]
         self.alloc.Free (offset, order)
         return self.stream.read (size)
@@ -111,7 +112,7 @@ class Sack (object):
             self.alloc_desc = desc
 
         # flush allocator's desc
-        self.stream.seek (self.offset - 8) # desc.size
+        self.stream.seek (self.offset) # desc.size
         self.stream.write (struct.pack ('Q', self.alloc_desc))
 
     # context manager

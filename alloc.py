@@ -83,6 +83,13 @@ class BuddyAllocator (object):
 
         self.map [order].append (offset)
 
+    @property
+    def UsedSpace (self):
+        used = 0
+        for order, map in enumerate (self.map):
+            used += len (map) * (1 << order)
+        return (1 << self.order) - used
+
     def Save (self, stream):
         """Save allocator state to stream"""
         stream.write (struct.pack ('B', self.order))

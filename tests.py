@@ -70,6 +70,21 @@ class BPTreeTest (unittest.TestCase):
         tree = BPTree (provider)
         validate (tree)
 
+        # Cursor
+        cursor = tree.GetCursor (11)
+        self.assertEqual (next (cursor), (11, '11'))
+        next (cursor)
+        self.assertEqual ((cursor.Key, cursor.Value), (12, '12'))
+        cursor.Value = '12'
+        cursor = ~cursor
+        self.assertEqual (list (cursor), [(12, '12'), (11, '11'), (10, '10')])
+        cursor = ~cursor
+        next (cursor)
+        self.assertEqual ((cursor.Key, cursor.Value), (10, '10'))
+
+        cursor = tree.GetCursor (1023)
+        self.assertEqual (list (cursor), [(1023, '1023')])
+
         # Insert (0 .. 10)
         for i in range (0, 10):
             tree [i], std [i] = str (i), str (i)
@@ -84,6 +99,8 @@ class BPTreeTest (unittest.TestCase):
         self.assertEqual (list (tree [100:201]), [(key, str (key)) for key in range (100, 202)])
         self.assertEqual (list (tree [:100]), [(key, str (key)) for key in range (0, 101)])
         self.assertEqual (list (tree [101:102.5]), [(101, '101'), (102, '102')])
+        self.assertEqual (list (tree [1022:]), [(1022, '1022'), (1023, '1023')])
+        self.assertEqual (list (tree [100:10]), [])
 
         # Deletion
         keys = list (range (count))
@@ -120,6 +137,8 @@ class BPTreeSackTest (BPTreeTest):
         if source is None:
             return SackProvider.Create (Sack.Create (io.BytesIO (), 32), 7)
         source.Flush ()
-        return SackProvider (source.sack, source.desc)
+        # reopen sack
+        sack = Sack (source.sack.stream, source.sack.offset)
+        return SackProvider (sack, source.desc)
 
 # vim: nu ft=python columns=120 :

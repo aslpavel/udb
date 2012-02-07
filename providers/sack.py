@@ -3,6 +3,7 @@ import sys
 import struct
 import array
 import io
+from bisect import bisect
 if sys.version_info [0] < 3:
     import cPickle as pickle
 else:
@@ -83,8 +84,8 @@ class SackProvider (Provider):
         # Flush Leafs                                                              #
         #--------------------------------------------------------------------------#
         queue = []
-        self.dirty, dirty = set (), self.dirty
-        for node in dirty:
+        dirty_nodes = set ()
+        for node in self.dirty:
             if node.is_leaf:
                 # Leaf:
                 #   0      1      9      17
@@ -96,17 +97,32 @@ class SackProvider (Provider):
                 data.write (b'\x01')                  # set node flag
                 data.seek (self.leaf_header.size + 1) # skip header
                 pickle.dump ((node.keys, node.children), data, self.pickle_version)
+
                 # enqueue
                 queue.append ((node, data))
+
                 # allocate space
                 desc = self.sack.Reserve (data.tell (), None if node.desc < 0 else node.desc)
-                # update descriptor maps
+
+                # check if node has been relocated
                 if node.desc != desc:
+                    # queue parent for update
+                    if node is not self.root:
+                        parent, key = self.root, node.keys [0]
+                        while True:
+                            parent_desc = parent.children [bisect (parent.keys, key)]
+                            if parent_desc == node.desc:
+                                break
+                            parent = self.d2n [parent_desc]
+                        if parent not in self.dirty:
+                            dirty_nodes.add (parent)
+
+                    # update descriptor maps
                     self.d2n.pop (node.desc)
                     d2n_reloc [node.desc], node.desc = node, desc
                     self.d2n [desc] = node
             else:
-                self.dirty.add (node)
+                dirty_nodes.add (node)
 
         # all leafs has been allocated now
         for leaf, data in queue:
@@ -141,7 +157,7 @@ class SackProvider (Provider):
                     node.children [index] = child.desc
                 else:
                     child = self.d2n.get (child_desc)
-                    if child in self.dirty:
+                    if child in dirty_nodes:
                         # flush child and update index
                         node.children [index] = node_flush (child)
 
@@ -160,25 +176,45 @@ class SackProvider (Provider):
             # put node in sack
             desc = self.sack.Push (data.getvalue (), None if node.desc < 0 else node.desc)
 
-            # update descriptor maps
+            # check if node has been relocated
             if node.desc != desc:
+                # queue parent for update
+                if node is not self.root:
+                    parent, key = self.root, node.keys [0]
+                    while True:
+                        parent_desc = parent.children [bisect (parent.keys, key)]
+                        if parent_desc == node.desc:
+                            break
+                        parent = self.d2n [parent_desc]
+                    if parent not in self.dirty:
+                        dirty_nodes.add (parent)
+
+                # update descriptor maps
                 self.d2n.pop (node.desc)
                 d2n_reloc [node.desc], node.desc = node, desc
                 self.d2n [desc] = node
 
             # remove node from dirty set
-            self.dirty.discard (node)
+            dirty_nodes.discard (node)
 
             return desc
 
-        while self.dirty:
-            node_flush (self.dirty.pop ())
+        while dirty_nodes:
+            node_flush (dirty_nodes.pop ())
+
+        # clear dirty set
+        self.dirty.clear ()
 
         #--------------------------------------------------------------------------#
         # Flush Header                                                             #
         #--------------------------------------------------------------------------#
         header = self.header.pack (self.order, self.depth, self.size, self.root.desc, self.pickle_version)
         self.desc = self.sack.Push (header)
+
+        #--------------------------------------------------------------------------#
+        # Flush Sack                                                               #
+        #--------------------------------------------------------------------------#
+        self.sack.Flush ()
 
     #--------------------------------------------------------------------------#
     # Provider Interface                                                       #

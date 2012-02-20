@@ -6,7 +6,7 @@ import contextlib
 from .utils import *
 from .bptree import *
 from .sack import *
-from .providers.sack import *
+from .providers.bytes import *
 
 __all__ = ('uDB',)
 
@@ -24,7 +24,7 @@ class uDB (BPTree):
     def __init__ (self, stream, close = False):
         stream.seek (0)
         provider_desc = struct.unpack ('>Q', stream.read (struct.calcsize ('>Q'))) [0]
-        BPTree.__init__ (self, SackProvider (Sack (stream, struct.calcsize ('>Q')), provider_desc))
+        BPTree.__init__ (self, SackBytesProvider (Sack (stream, struct.calcsize ('>Q')), provider_desc))
 
         # fields
         self.stream = stream
@@ -43,7 +43,7 @@ class uDB (BPTree):
             struct.calcsize ('>Q'))
 
         # create provider (with default order 32)
-        provider = SackProvider.Create (sack, order if order else default_bptree_order)
+        provider = SackBytesProvider.Create (sack, order if order else default_bptree_order)
         stream.seek (0)
         stream.write (struct.pack ('>Q', provider.desc))
         provider.Flush ()

@@ -13,12 +13,12 @@ else:
 from . import Provider
 from ..bptree import BPTreeNode, BPTreeLeaf
 
-__all__ = ('SackProvider',)
+__all__ = ('PickleProvider',)
 #------------------------------------------------------------------------------#
-# B+Tree Sack Provider                                                         #
+# B+Tree Pickle Sack Provider                                                  #
 #------------------------------------------------------------------------------#
 array_type = 'l'
-class SackProvider (Provider):
+class PickleProvider (Provider):
     def __init__ (self, sack, desc):
         """Load existing sack provider
 

@@ -13,12 +13,12 @@ from bisect import bisect
 from . import Provider
 from ..bptree import BPTreeNode, BPTreeLeaf
 
-__all__ = ('SackBytesProvider',)
+__all__ = ('BytesProvider',)
 #------------------------------------------------------------------------------#
-# B+Tree Sack Provider                                                         #
+# B+Tree Bytes Sack Provider                                                   #
 #------------------------------------------------------------------------------#
 array_type = 'l'
-class SackBytesProvider (Provider):
+class BytesProvider (Provider):
     def __init__ (self, sack, desc):
         """Load existing sack provider
 

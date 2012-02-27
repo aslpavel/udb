@@ -1,9 +1,7 @@
 # -*- coding: utf-8 -*-
-import os
 import struct
 import contextlib
 
-from .utils import *
 from .bptree import *
 from .sack.file import *
 from .providers.bytes import *
@@ -15,13 +13,13 @@ __all__ = ('uDB',)
 #------------------------------------------------------------------------------#
 default_sack_order    = 32      # 4GB
 default_bptree_order  = 32
-default_provider_type = SackBytesProvider
+default_provider_type = BytesProvider
 
 #------------------------------------------------------------------------------#
 # Micro Database Interface                                                     #
 #------------------------------------------------------------------------------#
 class uDB (BPTree):
-    def __init__ (self, file, mode = 'r', order = None, capacity_order = None, provider_type = None, **keys):
+    def __init__ (self, file, mode = 'r', order = None, capacity_order = None, provider_type = None):
         # init defaults
         provider_type  = default_provider_type if provider_type is None else provider_type
         capacity_order = default_sack_order if capacity_order is None else capacity_order

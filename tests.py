@@ -5,28 +5,28 @@ import unittest
 #------------------------------------------------------------------------------#
 # Sack                                                                         #
 #------------------------------------------------------------------------------#
-from .sack import *
+from .sack.stream import *
 class TestSack (unittest.TestCase):
     def test_Create (self):
-        Sack.Create (io.BytesIO (), 32, 10).Flush ()
+        StreamSack.Create (io.BytesIO (), 32, 10).Flush ()
 
     def test_Load (self):
         stream = io.BytesIO ()
-        Sack.Create (stream, 32, 10).Flush ()
-        Sack (stream, 10)
+        StreamSack.Create (stream, 32, 10).Flush ()
+        StreamSack (stream, 10)
 
     def test_PushPop (self):
         stream = io.BytesIO ()
-        with Sack.Create (stream, 32) as sack:
+        with StreamSack.Create (stream, 32) as sack:
             d0 = sack.Push (b'some data')
             d1 = sack.Push (b'some large data' * 100)
             d2 = sack.Push (b'test')
 
-        with Sack (stream) as sack:
+        with StreamSack (stream) as sack:
             self.assertEqual (sack.Get (d0), b'some data')
             self.assertEqual (sack.Pop (d1), b'some large data' * 100)
 
-        with Sack (stream) as sack:
+        with StreamSack (stream) as sack:
             self.assertEqual (sack.Get (d2), b'test')
             d2_new = sack.Push (b'test' * 10, d2)
             self.assertNotEqual (d2_new, d2)
@@ -129,16 +129,16 @@ class BPTreeTest (unittest.TestCase):
 # B+Tree with Sack Provider                                                    #
 #------------------------------------------------------------------------------#
 import io
-from .sack import *
+from .sack.stream import *
 from .providers.sack import *
 
 class BPTreeSackTest (BPTreeTest):
     def provider (self, source = None):
         if source is None:
-            return SackProvider.Create (Sack.Create (io.BytesIO (), 32), 7)
+            return SackProvider.Create (StreamSack.Create (io.BytesIO (), 32), 7)
         source.Flush ()
         # reopen sack
-        sack = Sack (source.sack.stream, source.sack.offset)
+        sack = StreamSack (source.sack.stream, source.sack.offset)
         return SackProvider (sack, source.desc)
 
 # vim: nu ft=python columns=120 :

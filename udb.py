@@ -5,7 +5,7 @@ import contextlib
 
 from .utils import *
 from .bptree import *
-from .sack import *
+from .sack.file import *
 from .providers.bytes import *
 
 __all__ = ('uDB',)
@@ -13,73 +13,37 @@ __all__ = ('uDB',)
 #------------------------------------------------------------------------------#
 # Default Values                                                               #
 #------------------------------------------------------------------------------#
-default_buffer_size  = 1 << 16 # 65536
-default_sack_order   = 32      # 4GB
-default_bptree_order = 32
+default_sack_order    = 32      # 4GB
+default_bptree_order  = 32
+default_provider_type = SackBytesProvider
 
 #------------------------------------------------------------------------------#
 # Micro Database Interface                                                     #
 #------------------------------------------------------------------------------#
 class uDB (BPTree):
-    def __init__ (self, stream, close = False):
+    def __init__ (self, file, mode = 'r', order = None, capacity_order = None, provider_type = None, **keys):
+        # init defaults
+        provider_type  = default_provider_type if provider_type is None else provider_type
+        capacity_order = default_sack_order if capacity_order is None else capacity_order
+        order          = default_bptree_order if order is None else order
+
+        # create sack
+        self.sack = FileSack (file, mode = mode, offset = struct.calcsize ('!Q'), order = capacity_order)
+        stream = self.sack.stream
+        if self.sack.IsNew:
+            # create new provider
+            provider = provider_type.Create (self.sack, order)
+            # save provider's descriptor
+            stream.seek (0)
+            stream.write (struct.pack ('!Q', provider.desc))
+            provider.Flush ()
+
         stream.seek (0)
-        provider_desc = struct.unpack ('>Q', stream.read (struct.calcsize ('>Q'))) [0]
-        BPTree.__init__ (self, SackBytesProvider (Sack (stream, struct.calcsize ('>Q')), provider_desc))
-
-        # fields
-        self.stream = stream
-        self.OnOpen = Event ()
-        self.OnClose = Event ()
-
-        if close:
-            self.OnClose += lambda: self.stream.close ()
-
-    # create
-    @classmethod
-    def Create (cls, stream, order = None, capacity_order = None, close = False,  **keys):
-        """Create new database"""
-        # create sack (default 4GB)
-        sack = Sack.Create (stream, capacity_order if capacity_order else default_sack_order,
-            struct.calcsize ('>Q'))
-
-        # create provider (with default order 32)
-        provider = SackBytesProvider.Create (sack, order if order else default_bptree_order)
-        stream.seek (0)
-        stream.write (struct.pack ('>Q', provider.desc))
-        provider.Flush ()
-
-        return cls (stream, close)
-
-    @classmethod
-    def Open (cls, path, mode = 'r', order = None, capacity_order = None):
-        """Open database
-
-        path: path to the file containing database
-        mode:
-            'r' : Open existing database for reading only
-            'w' : Open existing database for reading and writing
-            'c' : Open existing database for reading and writing, create if it doesn't exists
-            'n' : Always create a new database
-        """
-        if mode in ('r', 'w'):
-            return cls (open (path, 'rb' if mode == 'r' else 'r+b', buffering = default_buffer_size), close = True)
-
-        elif mode == 'c':
-            try:
-                return cls (open (path, 'r+b', buffering = default_buffer_size), close = True)
-            except IOError: pass
-            return cls.Create (open (path, 'w+b', buffering = default_buffer_size),
-                order, capacity_order, close = True)
-
-        elif mode == 'n':
-            return cls.Create (open (path, 'w+b', buffering = default_buffer_size),
-                order, capacity_order, close = True)
-
-        raise ValueError ('mode \'{0}\' is not available'.format (mode))
+        provider_desc = struct.unpack ('!Q', stream.read (struct.calcsize ('!Q'))) [0]
+        BPTree.__init__ (self, provider_type (self.sack, provider_desc))
 
     def Flush (self):
         self.provider.Flush ()
-        self.stream.flush ()
 
     # make transaction
     @contextlib.contextmanager
@@ -88,11 +52,10 @@ class uDB (BPTree):
         self.provider.Flush ()
 
     def __enter__ (self):
-        self.OnOpen ()
         return self
 
     def __exit__ (self, et, eo, tb):
-        self.OnClose ()
+        self.sack.__exit__ (et, eo, tb)
         return False
 
 # vim: nu ft=python columns=120 :

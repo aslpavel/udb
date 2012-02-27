@@ -2,14 +2,15 @@
 import io
 import struct
 
-from .alloc import *
+from ..alloc import *
+from ..utils import *
 
-__all__ = ('Sack',)
+__all__ = ('StreamSack',)
 #------------------------------------------------------------------------------#
-# Sack                                                                         #
+# Stream Sack                                                                  #
 #------------------------------------------------------------------------------#
-class Sack (object):
-    """Sack
+class StreamSack (object):
+    """Stream Sack
 
     Container which is capable storing data of arbitrary size in seekable a stream
     and associate it with unique descriptor
@@ -25,15 +26,18 @@ class Sack (object):
         self.data_offset = offset + 8 # desc.size
         self.header = struct.Struct ('I')
 
+        self.IsNew = new
         if not new:
             # find allocator dump
             stream.seek (offset)
             self.alloc_desc = struct.unpack ('Q', stream.read (8)) [0] # desc.from_stream
             self.alloc = BuddyAllocator.Restore (io.BytesIO (self.Get (self.alloc_desc)))
 
-    @staticmethod
-    def Create (stream, order, offset = 0):
-        sack = Sack (stream, offset, new = True)
+        self.OnFlush = Event ()
+
+    @classmethod
+    def Create (cls, stream, order, offset = 0):
+        sack = cls (stream, offset, new = True)
         sack.alloc, sack.alloc_desc = BuddyAllocator (order), None
         return sack
 
@@ -114,6 +118,9 @@ class Sack (object):
         # flush allocator's desc
         self.stream.seek (self.offset) # desc.size
         self.stream.write (struct.pack ('Q', self.alloc_desc))
+
+        # fire event
+        self.OnFlush (self)
 
     # context manager
     def __enter__ (self):

@@ -1,5 +1,4 @@
 # -*- coding: utf-8 -*-
-import io
 import struct
 
 from array import array
@@ -72,8 +71,8 @@ class BuddyAllocator (object):
             # check if buddy is in a free map
             buddy_index = bisect_left (map, buddy_offset)
             if not map or buddy_index >= len (map) or buddy_offset != map [buddy_index]:
-                    map.insert (buddy_index, offset)
-                    return
+                map.insert (buddy_index, offset)
+                return
 
             # merge with buddy
             map.pop (buddy_index)
@@ -81,6 +80,7 @@ class BuddyAllocator (object):
                 offset = buddy_offset
             order += 1
 
+        # last and the only block
         self.map [order].append (offset)
 
     @property

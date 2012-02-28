@@ -26,6 +26,7 @@ class uDB (BPTree):
         order          = default_bptree_order if order is None else order
 
         # create sack
+        self.mode = mode
         self.sack = FileSack (file, mode = mode, offset = struct.calcsize ('!Q'), order = capacity_order)
         stream = self.sack.stream
         if self.sack.IsNew:
@@ -53,6 +54,8 @@ class uDB (BPTree):
         return self
 
     def __exit__ (self, et, eo, tb):
+        if et is None and self.mode != 'r':
+            self.provider.Flush ()
         self.sack.__exit__ (et, eo, tb)
         return False
 

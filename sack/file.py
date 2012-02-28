@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 import os
 from .stream import *
-from ..alloc import *
+from .alloc import *
 
 __all__ = ('FileSack',)
 default_buffer_size = 1 << 16 # 64Kb
@@ -19,6 +19,7 @@ class FileSack (StreamSack):
         'n' : Always create a new sack
     """
     def __init__ (self, file, mode = 'r', offset = 0, order = None):
+        self.mode = mode
         if mode in ('c', 'n') and order is None:
             raise ValueError ('order must be provided for \'c\' and \'n\' modes')
 
@@ -45,7 +46,9 @@ class FileSack (StreamSack):
         raise NotImplementedError ('this method shluldn\'t be used')
 
     def __exit__ (self, et, eo, tb):
+        if self.mode != 'r':
+            StreamSack.__exit__ (self, et, eo, tb)
         self.stream.close ()
-        return StreamSack.__exit__ (self, et, eo, tb)
+        return False
 
 # vim: nu ft=python columns=120 :

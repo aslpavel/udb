@@ -84,49 +84,67 @@ class PickleProvider (Provider):
         #--------------------------------------------------------------------------#
         # Flush Leafs                                                              #
         #--------------------------------------------------------------------------#
-        queue = []
-        dirty_nodes = set ()
+        leaf_queue = []
+        def leaf_enqueue (leaf):
+            # Leaf:
+            #   0      1      9      17
+            #   +------+------+------+--------------------------+
+            #   | \x01 | prev | next | pickled (keys, children) |
+            #   +------+------+------+--------------------------+
+            ###
+            data = io.BytesIO ()
+            data.write (b'\x01')                  # set node flag
+            data.seek (self.leaf_header.size + 1) # skip header
+            pickle.dump ((leaf.keys, leaf.children), data, self.pickle_version)
+
+            # enqueue leaf
+            leaf_queue.append ((leaf, data))
+
+            # allocate space
+            desc = self.sack.Reserve (data.tell (), None if leaf.desc < 0 else leaf.desc)
+
+            # check if node has been relocated
+            if leaf.desc != desc:
+                # queue parent for update
+                if leaf is not self.root:
+                    parent, key = self.root, leaf.keys [0]
+                    while True:
+                        parent_desc = parent.children [bisect (parent.keys, key)]
+                        if parent_desc == leaf.desc:
+                            break
+                        parent = self.d2n [parent_desc]
+                    if parent not in self.dirty:
+                        node_queue.add (parent)
+
+                # queue next and previous for update
+                for sibling_desc in (leaf.prev, leaf.next):
+                    # descriptor is negative, node is dirty
+                    if sibling_desc > 0:
+                        sibling = self.d2n.get (sibling_desc)
+                        if sibling:
+                            # node has been loaded
+                            if sibling not in self.dirty:
+                                leaf_enqueue (sibling)
+                        else:
+                            if sibling_desc not in d2n_reloc:
+                                # node hasn't been loaded and hasn't been relocated
+                                leaf_enqueue (self.node_load (sibling_desc))
+
+                # update descriptor maps
+                self.d2n.pop (leaf.desc)
+                d2n_reloc [leaf.desc], node.desc = node, desc
+                self.d2n [leaf] = leaf
+
+        # enqueue leafs and create dirty nodes queue
+        node_queue = set ()
         for node in self.dirty:
             if node.is_leaf:
-                # Leaf:
-                #   0      1      9      17
-                #   +------+------+------+--------------------------+
-                #   | \x01 | prev | next | pickled (keys, children) |
-                #   +------+------+------+--------------------------+
-                ###
-                data = io.BytesIO ()
-                data.write (b'\x01')                  # set node flag
-                data.seek (self.leaf_header.size + 1) # skip header
-                pickle.dump ((node.keys, node.children), data, self.pickle_version)
-
-                # enqueue
-                queue.append ((node, data))
-
-                # allocate space
-                desc = self.sack.Reserve (data.tell (), None if node.desc < 0 else node.desc)
-
-                # check if node has been relocated
-                if node.desc != desc:
-                    # queue parent for update
-                    if node is not self.root:
-                        parent, key = self.root, node.keys [0]
-                        while True:
-                            parent_desc = parent.children [bisect (parent.keys, key)]
-                            if parent_desc == node.desc:
-                                break
-                            parent = self.d2n [parent_desc]
-                        if parent not in self.dirty:
-                            dirty_nodes.add (parent)
-
-                    # update descriptor maps
-                    self.d2n.pop (node.desc)
-                    d2n_reloc [node.desc], node.desc = node, desc
-                    self.d2n [desc] = node
+                leaf_enqueue (node)
             else:
-                dirty_nodes.add (node)
+                node_queue.add (node)
 
         # all leafs has been allocated now
-        for leaf, data in queue:
+        for leaf, data in leaf_queue:
             # update prev
             prev = d2n_reloc.get (leaf.prev)
             if prev is not None:
@@ -143,7 +161,7 @@ class PickleProvider (Provider):
             # put leaf in sack
             desc = self.sack.Push (data.getvalue (), leaf.desc)
             assert leaf.desc == desc
-        del queue
+        del leaf_queue
 
         #--------------------------------------------------------------------------#
         # Flush Nodes                                                              #
@@ -158,7 +176,7 @@ class PickleProvider (Provider):
                     node.children [index] = child.desc
                 else:
                     child = self.d2n.get (child_desc)
-                    if child in dirty_nodes:
+                    if child in node_queue:
                         # flush child and update index
                         node.children [index] = node_flush (child)
 
@@ -188,7 +206,7 @@ class PickleProvider (Provider):
                             break
                         parent = self.d2n [parent_desc]
                     if parent not in self.dirty:
-                        dirty_nodes.add (parent)
+                        node_queue.add (parent)
 
                 # update descriptor maps
                 self.d2n.pop (node.desc)
@@ -196,12 +214,12 @@ class PickleProvider (Provider):
                 self.d2n [desc] = node
 
             # remove node from dirty set
-            dirty_nodes.discard (node)
+            node_queue.discard (node)
 
             return desc
 
-        while dirty_nodes:
-            node_flush (dirty_nodes.pop ())
+        while node_queue:
+            node_flush (node_queue.pop ())
 
         # clear dirty set
         self.dirty.clear ()

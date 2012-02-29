@@ -55,7 +55,7 @@ class BuddyAllocator (object):
         size: size of block
         returns: (offset, order)
         """
-        order = int.bit_length (size - 1)
+        order = (size - 1).bit_length ()
         return self.AllocOrder (order), order
 
     def Free (self, offset, order):
@@ -83,6 +83,9 @@ class BuddyAllocator (object):
         # last and the only block
         self.map [order].append (offset)
 
+    #--------------------------------------------------------------------------#
+    # Debug Helpers                                                            #
+    #--------------------------------------------------------------------------#
     @property
     def UsedSpace (self):
         used = 0
@@ -90,12 +93,24 @@ class BuddyAllocator (object):
             used += len (map) * (1 << order)
         return (1 << self.order) - used
 
+    def IsAddressUsed (self, address):
+        """Check if given address is used"""
+        for order, map in enumerate (self.map):
+            size = 1 << order
+            for chunk in map:
+                if chunk <= address < chunk + size:
+                    return False
+        return True
+
+    #--------------------------------------------------------------------------#
+    # Save and Restore                                                         #
+    #--------------------------------------------------------------------------#
     def Save (self, stream):
         """Save allocator state to stream"""
         stream.write (struct.pack ('B', self.order))
-        array ('I', (len (map) for map in self.map)).tofile (stream)
+        stream.write (array ('I', (len (map) for map in self.map)).tostring ())
         for map in self.map:
-            map.tofile (stream)
+            stream.write (map.tostring ())
 
     @staticmethod
     def Restore (stream):
@@ -103,11 +118,12 @@ class BuddyAllocator (object):
         order = struct.unpack ('B', stream.read (struct.calcsize ('B'))) [0]
 
         sizes = array ('I')
-        sizes.fromfile (stream, order + 1)
+        sizes.fromstring (stream.read (sizes.itemsize * (order + 1)))
 
         map = [array ('L') for k in range (order + 1)]
+        itemsize = map [0].itemsize
         for k, size in enumerate (sizes):
-            map [k].fromfile (stream, size)
+            map [k].fromstring (stream.read (size * itemsize))
 
         return BuddyAllocator (order, map)
 

@@ -68,11 +68,6 @@ class BytesProvider (Provider):
 
         return provider
 
-    # TODO:
-    #   1. Atomic save:
-    #       Save all dirty nodes in new location, and if all dirty nodes has been saved
-    #       successfully update header and free old locations, otherwise free successfully
-    #       saved nodes and propagate exception.
     def Flush (self):
         """Flush cached values"""
 
@@ -82,7 +77,7 @@ class BytesProvider (Provider):
         #--------------------------------------------------------------------------#
         # Flush Leafs                                                              #
         #--------------------------------------------------------------------------#
-        leaf_queue = []
+        leaf_queue = {}
         def leaf_enqueue (leaf):
             # Leaf:
             #   0      1      9      17     ?
@@ -97,7 +92,7 @@ class BytesProvider (Provider):
             SaveBytesList (leaf.children, data)
 
             # enqueue leaf
-            leaf_queue.append ((leaf, data))
+            leaf_queue [leaf] = data
 
             # allocate space
             desc = self.sack.Reserve (data.tell (), None if leaf.desc < 0 else leaf.desc)
@@ -111,28 +106,31 @@ class BytesProvider (Provider):
                         parent_desc = parent.children [bisect (parent.keys, key)]
                         if parent_desc == leaf.desc:
                             break
-                        parent = self.d2n [parent_desc]
+                        parent = self.DescToNode (parent_desc)
                     if parent not in self.dirty:
                         node_queue.add (parent)
 
                 # queue next and previous for update
                 for sibling_desc in (leaf.prev, leaf.next):
                     # descriptor is negative, node is dirty
-                    if sibling_desc > 0:
+                    if (sibling_desc > 0 and                # negative node is dirty for sure
+                        sibling_desc not in d2n_reloc):     # relocated node is also dirty
+
                         sibling = self.d2n.get (sibling_desc)
                         if sibling:
-                            # node has been loaded
-                            if sibling not in self.dirty:
-                                leaf_enqueue (sibling)
+                            # node has already been loaded
+                            if (sibling not in self.dirty and
+                                sibling not in leaf_queue):
+                                    # queue it for update
+                                    leaf_enqueue (sibling)
                         else:
-                            if sibling_desc not in d2n_reloc:
-                                # node hasn't been loaded and hasn't been relocated
-                                leaf_enqueue (self.node_load (sibling_desc))
+                            # node hasn't been loaded
+                            leaf_enqueue (self.node_load (sibling_desc))
 
                 # update descriptor maps
                 self.d2n.pop (leaf.desc)
-                d2n_reloc [leaf.desc], node.desc = node, desc
-                self.d2n [leaf] = leaf
+                d2n_reloc [leaf.desc], leaf.desc = leaf, desc
+                self.d2n [desc] = leaf
 
         # enqueue leafs and create dirty nodes queue
         node_queue = set ()
@@ -143,7 +141,7 @@ class BytesProvider (Provider):
                 node_queue.add (node)
 
         # all leafs has been allocated now
-        for leaf, data in leaf_queue:
+        for leaf, data in leaf_queue.items ():
             # update prev
             prev = d2n_reloc.get (leaf.prev)
             if prev is not None:
@@ -160,7 +158,6 @@ class BytesProvider (Provider):
             # put leaf in sack
             desc = self.sack.Push (data.getvalue (), leaf.desc)
             assert leaf.desc == desc
-        del leaf_queue
 
         #--------------------------------------------------------------------------#
         # Flush Nodes                                                              #
@@ -189,7 +186,7 @@ class BytesProvider (Provider):
             data.write (b'\x00') # unset leaf flag
             data.write (self.node_header.pack (len (node.children)))
             SaveBytesList (node.keys, data)
-            node.children.tofile (data)
+            data.write (node.children.tostring ())
 
             # put node in sack
             desc = self.sack.Push (data.getvalue (), None if node.desc < 0 else node.desc)
@@ -249,6 +246,7 @@ class BytesProvider (Provider):
 
     def Release (self, node):
         self.d2n.pop (node.desc)
+        self.dirty.discard (node)
         if node.desc >= 0:
             self.sack.Pop (node.desc)
 
@@ -306,7 +304,7 @@ class BytesProvider (Provider):
             count = self.node_header.unpack (data.read (self.node_header.size)) [0]
             keys = list (LoadBytesList (data))
             children = array.array (array_type)
-            children.fromfile (data, count)
+            children.fromstring (data.read (children.itemsize * count))
             node = BPTreeSackNode (keys, children, desc)
 
         self.d2n [desc] = node
@@ -354,7 +352,7 @@ def LoadBytesList (stream):
     count = list_struct.unpack (stream.read (list_struct.size)) [0]
     # item sizes
     sizes = array.array ('I')
-    sizes.fromfile (stream, count)
+    sizes.fromstring (stream.read (sizes.itemsize * count))
     # items
     return [stream.read (size) for size in sizes]
 
@@ -363,7 +361,7 @@ def SaveBytesList (list, stream):
     stream.write (list_struct.pack (len (list)))
     # item sizes
     sizes = array.array ('I', (len (item) for item in list))
-    sizes.tofile (stream)
+    stream.write (sizes.tostring ())
     # items
     for item in list:
         stream.write (item)

@@ -35,4 +35,16 @@ class Provider (object):
     def Order (self):
         pass
 
+    # context
+    def Close (self, flush = True):
+        if flush:
+            self.Flush ()
+
+    def __enter__ (self):
+        return self
+
+    def __exit__ (self, et, eo, tb):
+        self.Close (et is None)
+        return False
+
 # vim: nu ft=python columns=120 :

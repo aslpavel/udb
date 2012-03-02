@@ -41,14 +41,13 @@ class FileSack (StreamSack):
         else:
             raise ValueError ('s')
 
+    def Close (self, flush = True):
+        if self.mode != 'r' and flush:
+            self.Flush ()
+        self.stream.close ()
+
     @staticmethod
     def Create (cls, stream, order, offset = 0):
         raise NotImplementedError ('this method shluldn\'t be used')
-
-    def __exit__ (self, et, eo, tb):
-        if self.mode != 'r':
-            StreamSack.__exit__ (self, et, eo, tb)
-        self.stream.close ()
-        return False
 
 # vim: nu ft=python columns=120 :

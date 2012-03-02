@@ -50,13 +50,14 @@ class uDB (BPTree):
         yield
         self.provider.Flush ()
 
+    def Close (self, flush = True):
+        self.provider.Close (self.mode != 'r' and flush)
+
     def __enter__ (self):
         return self
 
     def __exit__ (self, et, eo, tb):
-        if et is None and self.mode != 'r':
-            self.provider.Flush ()
-        self.sack.__exit__ (et, eo, tb)
+        self.Close (et is None)
         return False
 
 # vim: nu ft=python columns=120 :

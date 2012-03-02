@@ -122,13 +122,16 @@ class StreamSack (object):
         # fire event
         self.OnFlush (self)
 
+    def Close (self, flush = True):
+        if flush:
+            self.Flush ()
+
     # context manager
     def __enter__ (self):
         return self
 
     def __exit__ (self, et, eo, tb):
-        if et is None:
-            self.Flush ()
+        self.Close (et is None)
         return False
 
 # vim: nu ft=python columns=120 :

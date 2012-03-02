@@ -29,25 +29,21 @@ class FileSack (StreamSack):
             StreamSack.__init__ (self, open (file, 'r+b', buffering = default_buffer_size), offset)
         elif mode == 'c':
             if not os.path.lexists (file):
-                StreamSack.__init__ (self, open (file, 'w+b', buffering = default_buffer_size), offset, new = True)
-                self.alloc, self.alloc_desc = BuddyAllocator (order), None
+                StreamSack.__init__ (self, open (file, 'w+b', buffering = default_buffer_size),
+                    offset, new = True, order = order)
                 self.Flush ()
             else:
                 StreamSack.__init__ (self, open (file, 'r+b', buffering = default_buffer_size), offset)
         elif mode == 'n':
-            StreamSack.__init__ (self, open (file, 'w+b', buffering = default_buffer_size), offset, new = True)
-            self.alloc, self.alloc_desc = BuddyAllocator (order), None
+            StreamSack.__init__ (self, open (file, 'w+b', buffering = default_buffer_size),
+                offset, new = True, order = order)
             self.Flush ()
         else:
-            raise ValueError ('s')
+            raise ValueError ('Unsupported method')
 
     def Close (self, flush = True):
         if self.mode != 'r' and flush:
             self.Flush ()
         self.stream.close ()
-
-    @staticmethod
-    def Create (cls, stream, order, offset = 0):
-        raise NotImplementedError ('this method shluldn\'t be used')
 
 # vim: nu ft=python columns=120 :

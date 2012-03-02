@@ -20,7 +20,7 @@ class StreamSack (object):
         | offset | order |
         +--------+-------+
     """
-    def __init__ (self, stream, offset = 0, new = False):
+    def __init__ (self, stream, offset = 0, new = False, order = None):
         self.stream = stream
         self.offset = offset
         self.data_offset = offset + 8 # desc.size
@@ -32,14 +32,13 @@ class StreamSack (object):
             stream.seek (offset)
             self.alloc_desc = struct.unpack ('Q', stream.read (8)) [0] # desc.from_stream
             self.alloc = BuddyAllocator.Restore (io.BytesIO (self.Get (self.alloc_desc)))
+        else:
+            if order is None:
+                raise ValueError ('Order is required when creating new sack')
+            self.alloc_desc = None
+            self.alloc = BuddyAllocator (order)
 
         self.OnFlush = Event ()
-
-    @classmethod
-    def Create (cls, stream, order, offset = 0):
-        sack = cls (stream, offset, new = True)
-        sack.alloc, sack.alloc_desc = BuddyAllocator (order), None
-        return sack
 
     def Push (self, data, desc = None):
         """Push data

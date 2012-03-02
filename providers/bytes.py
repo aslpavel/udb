@@ -11,6 +11,7 @@ from bisect import bisect
 
 # local
 from . import Provider
+from ..utils import BytesList
 from ..bptree import BPTreeNode, BPTreeLeaf
 
 __all__ = ('BytesProvider',)
@@ -88,8 +89,12 @@ class BytesProvider (Provider):
             data = io.BytesIO ()
             data.write (b'\x01')                  # set node flag
             data.seek (self.leaf_header.size + 1) # skip header
-            SaveBytesList (leaf.keys, data)
-            SaveBytesList (leaf.children, data)
+            if not isinstance (leaf.keys, BytesList):
+                leaf.keys = BytesList (leaf.keys)
+            leaf.keys.Save (data)
+            if not isinstance (leaf.children, BytesList):
+                leaf.children = BytesList (leaf.keys)
+            leaf.children.Save (data)
 
             # enqueue leaf
             leaf_queue [leaf] = data
@@ -185,7 +190,9 @@ class BytesProvider (Provider):
             data = io.BytesIO ()
             data.write (b'\x00') # unset leaf flag
             data.write (self.node_header.pack (len (node.children)))
-            SaveBytesList (node.keys, data)
+            if not isinstance (node.keys, BytesList):
+                node.keys = BytesList (node.keys)
+            node.keys.Save (data)
             data.write (node.children.tostring ())
 
             # put node in sack
@@ -295,7 +302,7 @@ class BytesProvider (Provider):
             #   +------+------+------+------+----------+
             ###
             prev, next = self.leaf_header.unpack (data.read (self.leaf_header.size))
-            keys, children = LoadBytesList (data), LoadBytesList (data)
+            keys, children = BytesList.Load (data), BytesList.Load (data)
             node = BPTreeSackLeaf (keys, children, desc)
             node.prev, node.next = prev, next
         else:
@@ -306,7 +313,7 @@ class BytesProvider (Provider):
             #   +------+-------+------+----------+
             ###
             count = self.node_header.unpack (data.read (self.node_header.size)) [0]
-            keys = list (LoadBytesList (data))
+            keys = list (BytesList.Load (data))
             children = array.array (array_type)
             children.fromstring (data.read (children.itemsize * count))
             node = BPTreeSackNode (keys, children, desc)
@@ -346,28 +353,5 @@ class BPTreeSackLeaf (BPTreeLeaf):
     def __init__ (self, keys, children, desc):
         BPTreeLeaf.__init__ (self, keys, children)
         self.desc, self.prev, self.next = desc, 0, 0
-
-#------------------------------------------------------------------------------#
-# Save & Load Bytes List                                                       #
-#------------------------------------------------------------------------------#
-list_struct = struct.Struct ('!I')
-def LoadBytesList (stream):
-    # item count
-    count = list_struct.unpack (stream.read (list_struct.size)) [0]
-    # item sizes
-    sizes = array.array ('I')
-    sizes.fromstring (stream.read (sizes.itemsize * count))
-    # items
-    return [stream.read (size) for size in sizes]
-
-def SaveBytesList (list, stream):
-    # item count
-    stream.write (list_struct.pack (len (list)))
-    # item sizes
-    sizes = array.array ('I', (len (item) for item in list))
-    stream.write (sizes.tostring ())
-    # items
-    for item in list:
-        stream.write (item)
 
 # vim: nu ft=python columns=120 :

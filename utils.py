@@ -1,6 +1,8 @@
 # -*- coding: utf-8 -*-
+import array
+import struct
 
-__all__ = ('Event',)
+__all__ = ('Event', 'BytesList')
 #-----------------------------------------------------------------------------#
 # Event                                                                       #
 #-----------------------------------------------------------------------------#
@@ -22,5 +24,34 @@ class Event (object):
     def __isub__ (self, handler):
         self.__handlers.discard (handler)
         return self
+
+#------------------------------------------------------------------------------#
+# Bytes List                                                                   #
+#------------------------------------------------------------------------------#
+class BytesList (list):
+    count_header = struct.Struct ('!I')
+
+    def __init__ (self, items = tuple ()):
+        list.__init__ (self, items)
+
+    def Save (self, stream):
+        # item count
+        stream.write (self.count_header.pack (len (self)))
+        # item sizes
+        sizes = array.array ('I', (len (item) for item in self))
+        stream.write (sizes.tostring ())
+        # items
+        for item in self:
+            stream.write (item)
+
+    @classmethod
+    def Load (cls, stream):
+        # item count
+        count = cls.count_header.unpack (stream.read (cls.count_header.size)) [0]
+        # item sizes
+        sizes = array.array ('I')
+        sizes.fromstring (stream.read (sizes.itemsize * count))
+        # items
+        return cls (stream.read (size) for size in sizes)
 
 # vim: nu ft=python columns=120 :

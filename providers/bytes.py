@@ -231,9 +231,6 @@ class BytesProvider (Provider):
         #--------------------------------------------------------------------------#
         self.sack.Flush ()
 
-    def Close (self, flush = True):
-        self.sack.Close (flush)
-
     #--------------------------------------------------------------------------#
     # Provider Interface                                                       #
     #--------------------------------------------------------------------------#
@@ -280,6 +277,10 @@ class BytesProvider (Provider):
 
     def Order (self):
         return self.order
+
+    def Close (self, flush = True):
+        Provider.Close (self, flush)
+        self.sack.Close (flush)
 
     #--------------------------------------------------------------------------#
     # Private                                                                  #

@@ -280,6 +280,7 @@ class PickleProvider (Provider):
         return self.order
 
     def Close (self, flush = True):
+        Provider.Close (self, flush)
         self.sack.Close (flush)
 
     #--------------------------------------------------------------------------#

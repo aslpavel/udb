@@ -22,6 +22,9 @@ class Provider (object):
     def NodeCreate (self, keys, children, is_leaf):
         raise NotImplementedError ()
 
+    def Flush (self):
+        pass
+
     # properties
     def Size (self, value = None):
         raise NotImplementedError ()

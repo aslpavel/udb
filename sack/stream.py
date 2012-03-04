@@ -1,15 +1,13 @@
 # -*- coding: utf-8 -*-
-import io
 import struct
 
-from .alloc import *
-from ..utils import *
+from .sack import *
 
 __all__ = ('StreamSack',)
 #------------------------------------------------------------------------------#
 # Stream Sack                                                                  #
 #------------------------------------------------------------------------------#
-class StreamSack (object):
+class StreamSack (Sack):
     """Stream Sack
 
     Container which is capable storing data of arbitrary size in seekable a stream
@@ -20,25 +18,22 @@ class StreamSack (object):
         | offset | order |
         +--------+-------+
     """
-    def __init__ (self, stream, offset = 0, new = False, order = None):
+    def __init__ (self, stream, offset = 0, order = None, new = False):
+        # headers
+        self.data_header = struct.Struct ('!I')
+        self.header = struct.Struct ('!QQ')
+
         self.stream = stream
         self.offset = offset
-        self.data_offset = offset + 8 # desc.size
-        self.header = struct.Struct ('I')
+        self.data_offset = offset + self.header.size
 
         self.IsNew = new
-        if not new:
-            # find allocator dump
-            stream.seek (offset)
-            self.alloc_desc = struct.unpack ('Q', stream.read (8)) [0] # desc.from_stream
-            self.alloc = BuddyAllocator.Restore (io.BytesIO (self.Get (self.alloc_desc)))
+        if new:
+            Sack.__init__ (self, None, None, order)
         else:
-            if order is None:
-                raise ValueError ('Order is required when creating new sack')
-            self.alloc_desc = None
-            self.alloc = BuddyAllocator (order)
-
-        self.OnFlush = Event ()
+            stream.seek (offset)
+            alloc_desc, cell_desc = self.header.unpack (stream.read (self.header.size))
+            Sack.__init__ (self, cell_desc, alloc_desc)
 
     def Push (self, data, desc = None):
         """Push data
@@ -49,18 +44,18 @@ class StreamSack (object):
         """
         # try to save in previous location
         if desc is not None:
-            if len (data) + self.header.size  <= 1 << (desc & 0xff): # desc.capacity
+            if len (data) + self.data_header.size  <= 1 << (desc & 0xff): # desc.capacity
                 self.stream.seek (self.data_offset + (desc >> 8)) # desc.offset
-                self.stream.write (self.header.pack (len (data)))
+                self.stream.write (self.data_header.pack (len (data)))
                 self.stream.write (data)
                 return desc
             self.alloc.Free (desc >> 8, desc & 0xff) # desc.offset, desc.order
 
         # allocate new block
-        offset, order = self.alloc.Alloc (len (data) + self.header.size)
+        offset, order = self.alloc.Alloc (len (data) + self.data_header.size)
         try:
             self.stream.seek (self.data_offset + offset)
-            self.stream.write (self.header.pack (len (data)))
+            self.stream.write (self.data_header.pack (len (data)))
             self.stream.write (data)
 
             return order | offset << 8 # desc
@@ -75,11 +70,11 @@ class StreamSack (object):
         returns: space descriptor
         """
         if desc:
-            if size + self.header.size <= 1 << (desc & 0xff): # desc.capacity
+            if size + self.data_header.size <= 1 << (desc & 0xff): # desc.capacity
                 return desc
             self.alloc.Free (desc >> 8, desc & 0xff)
 
-        offset, order = self.alloc.Alloc (size + self.header.size)
+        offset, order = self.alloc.Alloc (size + self.data_header.size)
         return order | offset << 8 # desc
 
     def Get (self, desc):
@@ -89,7 +84,7 @@ class StreamSack (object):
         returns: data
         """
         self.stream.seek (self.data_offset + (desc >> 8)) # desc.offset
-        return self.stream.read (self.header.unpack (self.stream.read (self.header.size)) [0])
+        return self.stream.read (self.data_header.unpack (self.stream.read (self.data_header.size)) [0])
 
     def Pop (self, desc):
         """Pop data
@@ -99,38 +94,15 @@ class StreamSack (object):
         """
         offset, order = desc >> 8, desc & 0xff
         self.stream.seek (self.data_offset + offset)
-        size =  self.header.unpack (self.stream.read (self.header.size)) [0]
+        size =  self.data_header.unpack (self.stream.read (self.data_header.size)) [0]
         self.alloc.Free (offset, order)
         return self.stream.read (size)
 
     def Flush (self):
-        # flush allocator's state
-        while True:
-            state = io.BytesIO ()
-            self.alloc.Save (state)
-            desc = self.Push (state.getvalue (), self.alloc_desc)
-            if desc == self.alloc_desc:
-                self.alloc_desc = desc
-                break
-            self.alloc_desc = desc
+        Sack.Flush (self)
 
         # flush allocator's desc
-        self.stream.seek (self.offset) # desc.size
-        self.stream.write (struct.pack ('Q', self.alloc_desc))
-
-        # fire event
-        self.OnFlush (self)
-
-    def Close (self, flush = True):
-        if flush:
-            self.Flush ()
-
-    # context manager
-    def __enter__ (self):
-        return self
-
-    def __exit__ (self, et, eo, tb):
-        self.Close (et is None)
-        return False
+        self.stream.seek (self.offset)
+        self.stream.write (self.header.pack (self.alloc_desc, self.Cell.desc))
 
 # vim: nu ft=python columns=120 :

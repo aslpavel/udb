@@ -1,44 +1,67 @@
 # -*- coding: utf-8 -*-
+from __future__ import print_function
 import io
 import unittest
 
+from .bptree import *
+from .sack.stream import *
+from .providers.simple import *
+from .providers.pickle import *
+
+from random import shuffle
 #------------------------------------------------------------------------------#
 # Sack                                                                         #
 #------------------------------------------------------------------------------#
-from .sack.stream import *
 class TestSack (unittest.TestCase):
     def test_Create (self):
-        StreamSack.Create (io.BytesIO (), 32, 10).Flush ()
+        StreamSack (io.BytesIO (), offset = 10, order = 32, new = True)
 
     def test_Load (self):
         stream = io.BytesIO ()
-        StreamSack.Create (stream, 32, 10).Flush ()
-        StreamSack (stream, 10)
+        StreamSack (stream, offset = 10, order = 32, new = True).Flush ()
+        StreamSack (stream, offset = 10)
 
     def test_PushPop (self):
         stream = io.BytesIO ()
-        with StreamSack.Create (stream, 32) as sack:
+        with StreamSack (stream, 10, 32, True) as sack: # new sack
             d0 = sack.Push (b'some data')
             d1 = sack.Push (b'some large data' * 100)
             d2 = sack.Push (b'test')
 
-        with StreamSack (stream) as sack:
+        with StreamSack (stream, 10) as sack:
             self.assertEqual (sack.Get (d0), b'some data')
             self.assertEqual (sack.Pop (d1), b'some large data' * 100)
 
-        with StreamSack (stream) as sack:
+        with StreamSack (stream, 10) as sack:
             self.assertEqual (sack.Get (d2), b'test')
             d2_new = sack.Push (b'test' * 10, d2)
             self.assertNotEqual (d2_new, d2)
             self.assertEqual (sack.Push (b'abc', d1), d1)
 
+    def test_Cell (self):
+        stream = io.BytesIO ()
+        with StreamSack (stream, 10, 32, True) as sack:
+            self.assertEqual (len (sack.Cell), 0)
+            sack.Cell [1] = b'test'
+            self.assertEqual (len (sack.Cell), 2)
+
+        with StreamSack (stream, 10) as sack:
+            self.assertEqual (len (sack.Cell), 2)
+            self.assertEqual (sack.Cell [1], b'test')
+
+            # empty
+            self.assertEqual (sack.Cell [0], b'')
+            self.assertEqual (sack.Cell [2], b'')
+
+            del sack.Cell [1]
+            self.assertEqual (len (sack.Cell), 0)
+
+        with StreamSack (stream, 10) as sack:
+            self.assertEqual (len (sack.Cell.array), 0)
+
 #------------------------------------------------------------------------------#
 # B+Tree                                                                       #
 #------------------------------------------------------------------------------#
-from .bptree import *
-from .providers.simple import *
-from random import shuffle
-
 class BPTreeTest (unittest.TestCase):
     def test_Compare (self):
         provider = self.provider ()
@@ -128,14 +151,10 @@ class BPTreeTest (unittest.TestCase):
 #------------------------------------------------------------------------------#
 # B+Tree with Sack Provider                                                    #
 #------------------------------------------------------------------------------#
-import io
-from .sack.stream import *
-from .providers.pickle import *
-
 class BPTreeSackTest (BPTreeTest):
     def provider (self, source = None):
         if source is None:
-            return PickleProvider.Create (StreamSack.Create (io.BytesIO (), 32), 7)
+            return PickleProvider.Create (StreamSack (io.BytesIO (), order = 32, new = True), 7)
         source.Flush ()
         # reopen sack
         sack = StreamSack (source.sack.stream, source.sack.offset)

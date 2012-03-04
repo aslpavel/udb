@@ -47,7 +47,7 @@ class Provider (object):
         return self
 
     def __exit__ (self, et, eo, tb):
-        self.Close (et is None)
+        self.Close ()
         return False
 
 # vim: nu ft=python columns=120 :

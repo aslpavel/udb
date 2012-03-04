@@ -287,7 +287,7 @@ class BytesProvider (Provider):
 
     def Close (self, flush = True):
         Provider.Close (self, flush)
-        self.sack.Close (flush)
+        self.sack.Close (flush = False) # flushed by previous statement
 
     #--------------------------------------------------------------------------#
     # Private                                                                  #

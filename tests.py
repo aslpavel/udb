@@ -154,10 +154,10 @@ class BPTreeTest (unittest.TestCase):
 class BPTreeSackTest (BPTreeTest):
     def provider (self, source = None):
         if source is None:
-            return PickleProvider.Create (StreamSack (io.BytesIO (), order = 32, new = True), 7)
+            return PickleProvider (StreamSack (io.BytesIO (), order = 32, new = True), 7)
         source.Flush ()
         # reopen sack
         sack = StreamSack (source.sack.stream, source.sack.offset)
-        return PickleProvider (sack, source.desc)
+        return PickleProvider (sack)
 
 # vim: nu ft=python columns=120 :

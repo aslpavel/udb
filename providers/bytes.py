@@ -20,7 +20,7 @@ __all__ = ('BytesProvider',)
 #------------------------------------------------------------------------------#
 array_type = 'l'
 class BytesProvider (Provider):
-    def __init__ (self, sack, desc):
+    def __init__ (self, sack, order = None, cell = 0):
         """Load existing sack provider
 
         sack: sack used as backing store
@@ -48,26 +48,23 @@ class BytesProvider (Provider):
         self.dirty = set ()
         self.desc_next = -1
 
-        self.desc = desc
-        if desc is not None:
-            header = sack.Get (desc)
+        self.cell = cell
+        header = self.sack.Cell [cell]
+        if len (header):
             self.order, self.depth, self.size, root_desc = self.header.unpack_from (header)
             self.root = self.node_load (root_desc)
+        else:
+            # cell is not set create new provider
+            if order is None:
+                raise ValueError ('Order is required to create new provider')
 
-    @classmethod
-    def Create (cls, sack, order):
-        """Create new sack provider
+            # init provider
+            self.order = order
+            self.depth = 1
+            self.size  = 0
+            self.root = self.NodeCreate ([], [], True)
 
-        sack: sack used as backing store
-        uid:  uid of header in the sack
-        """
-        provider = cls (sack, None)
-        provider.order, provider.depth, provider.size = order, 1, 0
-        provider.root = provider.NodeCreate ([], [], True)
-        provider.desc = sack.Reserve (provider.header.size)
-        provider.Flush ()
-
-        return provider
+            self.Flush ()
 
     def Flush (self):
         """Flush cached values"""
@@ -231,7 +228,7 @@ class BytesProvider (Provider):
         # Flush Header                                                             #
         #--------------------------------------------------------------------------#
         header = self.header.pack (self.order, self.depth, self.size, self.root.desc)
-        self.sack.Push (header, self.desc)
+        self.sack.Cell [self.cell] = header
 
         #--------------------------------------------------------------------------#
         # Flush Sack                                                               #

@@ -1,5 +1,4 @@
 # -*- coding: utf-8 -*-
-import struct
 import contextlib
 
 from .bptree import *
@@ -14,39 +13,34 @@ __all__ = ('uDB',)
 default_sack_order    = 32      # 4GB
 default_bptree_order  = 32
 default_provider_type = BytesProvider
+default_cell          = 0
 
 #------------------------------------------------------------------------------#
 # Micro Database Interface                                                     #
 #------------------------------------------------------------------------------#
 class uDB (BPTree):
-    def __init__ (self, file, mode = 'r', order = None, capacity_order = None, provider_type = None):
+    def __init__ (self, file, mode = 'r', order = None, cell = None, capacity_order = None, provider_type = None):
         # init defaults
         provider_type  = default_provider_type if provider_type is None else provider_type
         capacity_order = default_sack_order if capacity_order is None else capacity_order
         order          = default_bptree_order if order is None else order
+        cell           = default_cell if cell is None else cell
 
-        # create sack
+        # open sack
         self.mode = mode
-        self.sack = FileSack (file, mode = mode, offset = struct.calcsize ('!Q'), order = capacity_order)
-        stream = self.sack.stream
-        if self.sack.IsNew:
-            # create new provider
-            provider = provider_type.Create (self.sack, order)
-            # save provider's descriptor
-            stream.seek (0)
-            stream.write (struct.pack ('!Q', provider.desc))
-            provider.Flush ()
+        self.sack = FileSack (file, mode = mode, order = capacity_order)
 
-        stream.seek (0)
-        provider_desc = struct.unpack ('!Q', stream.read (struct.calcsize ('!Q'))) [0]
-        BPTree.__init__ (self, provider_type (self.sack, provider_desc))
+        BPTree.__init__ (self, provider_type (self.sack, order = order, cell = cell))
 
     def Flush (self):
         self.provider.Flush ()
 
-    # make transaction
     @contextlib.contextmanager
     def Transaction (self):
+        """Compatibility with old uDB
+
+        TODO: remove it
+        """
         yield
         self.provider.Flush ()
 

@@ -50,8 +50,8 @@ class TestSack (unittest.TestCase):
             self.assertEqual (sack.Cell [1], b'test')
 
             # empty
-            self.assertEqual (sack.Cell [0], b'')
-            self.assertEqual (sack.Cell [2], b'')
+            self.assertEqual (sack.Cell [0], None)
+            self.assertEqual (sack.Cell [2], None)
 
             del sack.Cell [1]
             self.assertEqual (len (sack.Cell), 0)

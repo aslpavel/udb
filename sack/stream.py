@@ -27,7 +27,6 @@ class StreamSack (Sack):
         self.offset = offset
         self.data_offset = offset + self.header.size
 
-        self.IsNew = new
         if new:
             Sack.__init__ (self, None, None, order)
         else:
@@ -53,6 +52,7 @@ class StreamSack (Sack):
 
         # allocate new block
         offset, order = self.alloc.Alloc (len (data) + self.data_header.size)
+        self.resize (self.data_offset + offset + (1 << order))
         try:
             self.stream.seek (self.data_offset + offset)
             self.stream.write (self.data_header.pack (len (data)))
@@ -75,6 +75,7 @@ class StreamSack (Sack):
             self.alloc.Free (desc >> 8, desc & 0xff)
 
         offset, order = self.alloc.Alloc (size + self.data_header.size)
+        self.resize (self.data_offset + offset + (1 << order))
         return order | offset << 8 # desc
 
     def Get (self, desc):
@@ -94,15 +95,24 @@ class StreamSack (Sack):
         """
         offset, order = desc >> 8, desc & 0xff
         self.stream.seek (self.data_offset + offset)
-        size =  self.data_header.unpack (self.stream.read (self.data_header.size)) [0]
         self.alloc.Free (offset, order)
-        return self.stream.read (size)
+        return self.stream.read (self.data_header.unpack (self.stream.read (self.data_header.size)) [0])
 
     def Flush (self):
         Sack.Flush (self)
-
-        # flush allocator's desc
+        # flush header
         self.stream.seek (self.offset)
         self.stream.write (self.header.pack (self.alloc_desc, self.Cell.desc))
+        self.stream.flush ()
+
+    #--------------------------------------------------------------------------#
+    # private                                                                  #
+    #--------------------------------------------------------------------------#
+    def resize (self, size):
+        """Resize stream if needed
+
+        This hook is used by mmap
+        """
+        pass
 
 # vim: nu ft=python columns=120 :

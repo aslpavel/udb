@@ -39,7 +39,7 @@ class FileSack (StreamSack):
                 offset, new = True, order = order)
             self.Flush ()
         else:
-            raise ValueError ('Unsupported method')
+            raise ValueError ('Unsupported open mode')
 
     def Close (self, flush = True):
         if self.mode != 'r' and flush:

@@ -1,9 +1,10 @@
 # -*- coding: utf-8 -*-
 from .udb import uDB
+from .sack.file import *
 from .providers.pickle import *
 from .providers.bytes import *
 
-__all__ = ('uDB', 'PickleProvider', 'BytesProvider')
+__all__ = ('uDB', 'PickleProvider', 'BytesProvider', 'FileSack')
 
 #------------------------------------------------------------------------------#
 # Load Tests Protocol                                                          #

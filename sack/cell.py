@@ -15,13 +15,13 @@ class Cell (object):
     def __getitem__ (self, index):
         """Get cell value"""
         if len (self.array) <= index:
-            return b''
+            return None
         return self.array [index]
 
     def __setitem__ (self, index, value):
         """Set cell value"""
         if index >= len (self.array):
-            self.array.extend ((b'',) * (index - len (self.array) + 1))
+            self.array.extend ((None,) * (index - len (self.array) + 1))
         self.array [index] = value
 
     def __delitem__ (self, index):
@@ -31,12 +31,12 @@ class Cell (object):
         """
         if index >= len (self.array):
             return
-        self.array [index] = b''
+        self.array [index] = None
 
     def __len__ (self):
         length = 0
         for index, item in enumerate (self.array):
-            if len (item) > 0:
+            if item is not None:
                 length = index + 1
         return length
 

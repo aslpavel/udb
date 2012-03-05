@@ -38,20 +38,21 @@ class BytesList (list):
         # item count
         stream.write (self.count_header.pack (len (self)))
         # item sizes
-        sizes = array.array ('I', (len (item) for item in self))
+        sizes = array.array ('i', ((-1 if item is None else len (item)) for item in self))
         stream.write (sizes.tostring ())
         # items
         for item in self:
-            stream.write (item)
+            if item is not None:
+                stream.write (item)
 
     @classmethod
     def Load (cls, stream):
         # item count
         count = cls.count_header.unpack (stream.read (cls.count_header.size)) [0]
         # item sizes
-        sizes = array.array ('I')
+        sizes = array.array ('i')
         sizes.fromstring (stream.read (sizes.itemsize * count))
         # items
-        return cls (stream.read (size) for size in sizes)
+        return cls ((stream.read (size) if size >= 0 else None) for size in sizes)
 
 # vim: nu ft=python columns=120 :

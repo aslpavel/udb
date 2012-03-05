@@ -50,7 +50,7 @@ class BytesProvider (Provider):
 
         self.cell = cell
         header = self.sack.Cell [cell]
-        if len (header):
+        if header:
             self.order, self.depth, self.size, root_desc = self.header.unpack_from (header)
             self.root = self.node_load (root_desc)
         else:

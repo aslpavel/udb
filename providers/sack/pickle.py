@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-import os
+import io
 import sys
 import array
 import struct
@@ -70,7 +70,7 @@ class Leaf (BPTreeLeaf):
     # Save | Load                                                              #
     #--------------------------------------------------------------------------#
     def Save (self, stream):
-        stream.seek (self.header.size, os.SEEK_CUR)
+        stream.seek (self.header.size, io.SEEK_CUR)
         pickle.dump ((self.keys, self.children), stream, pickle_version)
 
     def SaveHeader (self, stream):

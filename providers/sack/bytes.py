@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-import os
+import io
 import array
 import struct
 
@@ -86,7 +86,7 @@ class Leaf (BPTreeLeaf):
     # Save | Load                                                              #
     #--------------------------------------------------------------------------#
     def Save (self, stream):
-        stream.seek (self.header.size, os.SEEK_CUR)
+        stream.seek (self.header.size, io.SEEK_CUR)
         self.keys.Save (stream)
         self.children.Save (stream)
 

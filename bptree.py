@@ -120,10 +120,10 @@ class BPTree (MutableMapping):
 
             # node is full so we need to split it
             center = len (node.children) >> 1
+            keys, children = node.Chop (center)
             if node.is_leaf:
                 # create right sibling
-                sibling = self.provider.NodeCreate (node.keys [center:], node.children [center:], True)
-                node.keys, node.children = node.keys [:center], node.children [:center]
+                sibling = self.provider.NodeCreate (keys, children, True)
 
                 # keep leafs linked
                 sibling_desc, node_next_desc = node2desc (sibling), node.next
@@ -138,8 +138,7 @@ class BPTree (MutableMapping):
 
             else:
                 # create right sibling
-                sibling = self.provider.NodeCreate (node.keys [center:], node.children [center:], False)
-                node.keys, node.children = node.keys [:center], node.children [:center]
+                sibling = self.provider.NodeCreate (keys, children, False)
 
                 # update key
                 key, value = node.keys.pop (), node2desc (sibling)
@@ -394,6 +393,11 @@ class BPTreeNode (object):
 
     def __init__ (self, keys, children, is_leaf = False):
         self.keys, self.children, self.is_leaf = keys, children, is_leaf
+
+    def Chop (self, index):
+        keys, self.keys = self.keys [index:], self.keys [:index]
+        children, self.children = self.children [index:], self.children [:index]
+        return keys, children
 
 class BPTreeLeaf (BPTreeNode):
     __slots__ = ('keys', 'children', 'is_leaf', 'next', 'prev')

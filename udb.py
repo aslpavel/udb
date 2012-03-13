@@ -3,7 +3,7 @@ import contextlib
 
 from .bptree import *
 from .sack.file import *
-from .providers.bytes import *
+from .providers.sack import *
 
 __all__ = ('uDB',)
 
@@ -12,7 +12,7 @@ __all__ = ('uDB',)
 #------------------------------------------------------------------------------#
 default_sack_order    = 32      # 4GB
 default_bptree_order  = 32
-default_provider_type = BytesProvider
+default_provider_type = 'SS'
 default_cell          = 0
 
 #------------------------------------------------------------------------------#
@@ -30,7 +30,7 @@ class uDB (BPTree):
         self.mode = mode
         self.sack = FileSack (file, mode = mode, order = capacity_order)
 
-        BPTree.__init__ (self, provider_type (self.sack, order = order, cell = cell))
+        BPTree.__init__ (self, SackProvider (self.sack, order = order, type = provider_type, cell = cell))
 
     def Flush (self):
         self.provider.Flush ()

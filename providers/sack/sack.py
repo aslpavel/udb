@@ -1,48 +1,38 @@
 # -*- coding: utf-8 -*-
-"""Sack Bytes Provider
-
-Sack based provider without pickle
-"""
+"""Sack Provider"""
+import io
 import sys
 import struct
-import array
-import io
 from bisect import bisect
 
 # local
-from . import Provider
-from ..utils import BytesList
-from ..bptree import BPTreeNode, BPTreeLeaf
+from .. import Provider
 
-__all__ = ('BytesProvider',)
+__all__ = ('SackProvider',)
 #------------------------------------------------------------------------------#
-# B+Tree Bytes Sack Provider                                                   #
+# B+Tree Sack Provider                                                         #
 #------------------------------------------------------------------------------#
-array_type = 'l'
-class BytesProvider (Provider):
-    def __init__ (self, sack, order = None, cell = 0):
-        """Load existing sack provider
+class SackProvider (Provider):
+    def __init__ (self, sack, order = None, type = None, cell = 0):
+        """Sack Provider
 
-        sack: sack used as backing store
-        uid:  uid of header in the sack
+        sack  : sack backing store
+        order : maximum children count inside node
+        cell  : cell with header
+        type  : sack type
         """
         self.sack = sack
+        self.order = order
+        self.type = type
+
         # Header:
-        #   'I' order
-        #   'I' depth
-        #   'Q' size
-        #   'Q' root descriptor
+        #   '2s' type
+        #   'I'  order
+        #   'I'  depth
+        #   'Q'  size
+        #   'Q'  root descriptor
         ###
-        self.header = struct.Struct ('!IIQQ')
-        # Leaf Header:
-        #   'Q' prev
-        #   'Q' next
-        ###
-        self.leaf_header = struct.Struct ('!QQ')
-        # Node Header:
-        #   'H' count
-        ###
-        self.node_header = struct.Struct ('!H')
+        self.header = struct.Struct ('!2sIIQQ')
 
         self.d2n = {}
         self.dirty = set ()
@@ -51,14 +41,21 @@ class BytesProvider (Provider):
         self.cell = cell
         header = self.sack.Cell [cell]
         if header:
-            self.order, self.depth, self.size, root_desc = self.header.unpack_from (header)
+            type , self.order, self.depth, self.size, root_desc = self.header.unpack_from (header)
+            type = type.decode ('utf-8')
+            if self.type and self.type != type:
+                raise ValueError ('Type mismatch requested \'{}\', but found \'{}\''.format (self.type, type))
+            self.type_resolve (type)
             self.root = self.node_load (root_desc)
         else:
             # cell is not set create new provider
             if order is None:
                 raise ValueError ('Order is required to create new provider')
+            if type is None:
+                raise ValueError ('Type is required to create new provider')
 
             # init provider
+            self.type_resolve (type)
             self.order = order
             self.depth = 1
             self.size  = 0
@@ -77,21 +74,9 @@ class BytesProvider (Provider):
         #--------------------------------------------------------------------------#
         leaf_queue = {}
         def leaf_enqueue (leaf):
-            # Leaf:
-            #   0      1      9      17     ?
-            #   +------+------+------+------+----------+
-            #   | \x01 | prev | next | keys | children |
-            #   +------+------+------+------+----------+
-            ###
             data = io.BytesIO ()
             data.write (b'\x01')                  # set node flag
-            data.seek (self.leaf_header.size + 1) # skip header
-            if not isinstance (leaf.keys, BytesList):
-                leaf.keys = BytesList (leaf.keys)
-            leaf.keys.Save (data)
-            if not isinstance (leaf.children, BytesList):
-                leaf.children = BytesList (leaf.keys)
-            leaf.children.Save (data)
+            leaf.Save (data)
 
             # enqueue leaf
             leaf_queue [leaf] = data
@@ -155,7 +140,7 @@ class BytesProvider (Provider):
 
             # write header
             data.seek (1)
-            data.write (self.leaf_header.pack (leaf.prev, leaf.next))
+            leaf.SaveHeader (data)
 
             # put leaf in sack
             desc = self.sack.Push (data.getvalue (), leaf.desc)
@@ -178,19 +163,10 @@ class BytesProvider (Provider):
                         # flush child and update index
                         node.children [index] = node_flush (child)
 
-            # Node:
-            #   0      1       5      ?         + (8 * count)
-            #   +------+-------+------+----------+
-            #   | \x00 | count | keys | children |
-            #   +------+-------+------+----------+
-            ###
+            # save
             data = io.BytesIO ()
             data.write (b'\x00') # unset leaf flag
-            data.write (self.node_header.pack (len (node.children)))
-            if not isinstance (node.keys, BytesList):
-                node.keys = BytesList (node.keys)
-            node.keys.Save (data)
-            data.write (node.children.tostring ())
+            node.Save (data)
 
             # put node in sack
             desc = self.sack.Push (data.getvalue (), None if node.desc < 0 else node.desc)
@@ -227,7 +203,7 @@ class BytesProvider (Provider):
         #--------------------------------------------------------------------------#
         # Flush Header                                                             #
         #--------------------------------------------------------------------------#
-        header = self.header.pack (self.order, self.depth, self.size, self.root.desc)
+        header = self.header.pack (self.type.encode ('utf-8'), self.order, self.depth, self.size, self.root.desc)
         self.sack.Cell [self.cell] = header
 
         #--------------------------------------------------------------------------#
@@ -256,12 +232,8 @@ class BytesProvider (Provider):
 
     def NodeCreate (self, keys, children, is_leaf):
         desc, self.desc_next = self.desc_next, self.desc_next - 1
-        if is_leaf:
-            node = BPTreeSackLeaf (keys, children, desc)
-        else:
-            if isinstance (children, list):
-                children = array.array (array_type, children)
-            node = BPTreeSackNode (keys, children, desc)
+        node = (self.leaf_type (keys, children, desc) if is_leaf else
+            self.node_type (keys, children, desc))
 
         self.d2n [desc] = node
         self.dirty.add (node)
@@ -291,64 +263,19 @@ class BytesProvider (Provider):
     #--------------------------------------------------------------------------#
     def node_load (self, desc):
         data = io.BytesIO (self.sack.Get (desc))
-        if data.read (1) == b'\x01':
-            # Leaf:
-            #   0      1      9      17     ?
-            #   +------+------+------+------+----------+
-            #   | \x01 | prev | next | keys | children |
-            #   +------+------+------+------+----------+
-            ###
-            prev, next = self.leaf_header.unpack (data.read (self.leaf_header.size))
-            keys, children = BytesList.Load (data), BytesList.Load (data)
-            node = BPTreeSackLeaf (keys, children, desc)
-            node.prev, node.next = prev, next
-        else:
-            # Node:
-            #   0      1       5      ?         + (8 * count)
-            #   +------+-------+------+----------+
-            #   | \x00 | count | keys | children |
-            #   +------+-------+------+----------+
-            ###
-            count = self.node_header.unpack (data.read (self.node_header.size)) [0]
-            keys = list (BytesList.Load (data))
-            children = array.array (array_type)
-            children.fromstring (data.read (children.itemsize * count))
-            node = BPTreeSackNode (keys, children, desc)
-
+        node = (self.leaf_type.Load (desc, data) if data.read (1) == b'\x01' else
+            self.node_type.Load (desc, data))
         self.d2n [desc] = node
         return node
 
-#------------------------------------------------------------------------------#
-# Sack Provider Node                                                           #
-#------------------------------------------------------------------------------#
-class BPTreeSackNode (BPTreeNode):
-    r"""B+Tree Node
-
-    Dump Structure:
-        0      1       5      ?         + (8 * count)
-        +------+-------+------+----------+
-        | \x00 | count | keys | children |
-        +------+-------+------+----------+
-    """
-    __slots__ = ('keys', 'children', 'is_leaf', 'desc')
-
-    def __init__ (self, keys, children, desc):
-        BPTreeNode.__init__ (self, keys, children)
-        self.desc = desc
-
-class BPTreeSackLeaf (BPTreeLeaf):
-    r"""B+Tree Leaf
-
-    Dump Structure:
-        0      1      9      17     ?          ?
-        +------+------+------+------+----------+
-        | \x01 | prev | next | keys | children |
-        +------+------+------+------+----------+
-    """
-    __slots__ = ('keys', 'children', 'is_leaf', 'prev', 'next', 'desc')
-
-    def __init__ (self, keys, children, desc):
-        BPTreeLeaf.__init__ (self, keys, children)
-        self.desc, self.prev, self.next = desc, 0, 0
-
+    def type_resolve (self, type):
+        self.type = type
+        if type == 'SS':
+            from .bytes import Node, Leaf
+            self.node_type, self.leaf_type = Node, Leaf
+        elif type == 'PP':
+            from .pickle import Node, Leaf
+            self.node_type, self.leaf_type = Node, Leaf
+        else:
+            raise TypeError ('Unsupported type \'{}\''.format (type))
 # vim: nu ft=python columns=120 :

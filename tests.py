@@ -6,7 +6,7 @@ import unittest
 from .bptree import *
 from .sack.stream import *
 from .providers.simple import *
-from .providers.pickle import *
+from .providers.sack import *
 
 from random import shuffle
 #------------------------------------------------------------------------------#
@@ -154,10 +154,8 @@ class BPTreeTest (unittest.TestCase):
 class BPTreeSackTest (BPTreeTest):
     def provider (self, source = None):
         if source is None:
-            return PickleProvider (StreamSack (io.BytesIO (), order = 32, new = True), 7)
+            return SackProvider (StreamSack (io.BytesIO (), order = 32, new = True), order = 7, type = 'PP')
         source.Flush ()
-        # reopen sack
-        sack = StreamSack (source.sack.stream, source.sack.offset)
-        return PickleProvider (sack)
+        return SackProvider (StreamSack (source.sack.stream, source.sack.offset))
 
 # vim: nu ft=python columns=120 :

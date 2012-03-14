@@ -22,9 +22,6 @@ class Sack (object):
         # cell
         self.Cell = Cell (self, cell_desc)
 
-        # events
-        self.OnFlush = Event ()
-
     def Get (self, desc):
         raise NotImplementedError ('Abstract method')
 
@@ -43,8 +40,6 @@ class Sack (object):
                 self.alloc_desc = desc
                 break
             self.alloc_desc = desc
-
-        self.OnFlush (self)
 
     def Close (self, flush = True):
         if flush:

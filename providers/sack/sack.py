@@ -75,7 +75,7 @@ class SackProvider (Provider):
         leaf_queue = {}
         def leaf_enqueue (leaf):
             data = io.BytesIO ()
-            data.write (b'\x01')                  # set node flag
+            data.write (b'\x01') # set node flag
             leaf.Save (data)
 
             # enqueue leaf
@@ -254,9 +254,12 @@ class SackProvider (Provider):
     def Order (self):
         return self.order
 
-    def Close (self, flush = True):
-        Provider.Close (self, flush)
-        self.sack.Close (flush = False) # flushed by previous statement
+    #--------------------------------------------------------------------------#
+    # Dispose                                                                  #
+    #--------------------------------------------------------------------------#
+    def Dispose (self):
+        if not self.sack.IsReadOnly:
+            self.Flush ()
 
     #--------------------------------------------------------------------------#
     # Private                                                                  #

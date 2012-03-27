@@ -154,7 +154,7 @@ class BPTreeTest (unittest.TestCase):
 class BPTreeSackTest (BPTreeTest):
     def provider (self, source = None):
         if source is None:
-            return SackProvider (StreamSack (io.BytesIO (), order = 32, new = True), order = 7, type = 'PP')
+            return SackProvider (StreamSack (io.BytesIO (), order = 32, new = True, readonly = False), order = 7, type = 'PP')
         source.Flush ()
         return SackProvider (StreamSack (source.sack.stream, source.sack.offset))
 

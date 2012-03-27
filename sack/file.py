@@ -24,7 +24,7 @@ class FileSack (StreamSack):
             raise ValueError ('order must be provided for \'c\' and \'n\' modes')
 
         if mode == 'r':
-            StreamSack.__init__ (self, open (file, 'rb', buffering = default_buffer_size), offset)
+            StreamSack.__init__ (self, open (file, 'rb', buffering = default_buffer_size), offset, readonly = True)
         elif mode == 'w':
             StreamSack.__init__ (self, open (file, 'r+b', buffering = default_buffer_size), offset)
         elif mode == 'c':
@@ -41,9 +41,11 @@ class FileSack (StreamSack):
         else:
             raise ValueError ('Unsupported open mode')
 
-    def Close (self, flush = True):
-        if self.mode != 'r' and flush:
-            self.Flush ()
+    #--------------------------------------------------------------------------#
+    # Dispose                                                                  #
+    #--------------------------------------------------------------------------#
+    def Dispose (self):
+        StreamSack.Dispose (self)
         self.stream.close ()
 
 # vim: nu ft=python columns=120 :

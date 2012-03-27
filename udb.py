@@ -32,9 +32,31 @@ class uDB (BPTree):
 
         BPTree.__init__ (self, SackProvider (self.sack, order = order, type = provider_type, cell = cell))
 
+    #--------------------------------------------------------------------------#
+    # Flush                                                                    #
+    #--------------------------------------------------------------------------#
     def Flush (self):
         self.provider.Flush ()
 
+    #--------------------------------------------------------------------------#
+    # Dispose                                                                  #
+    #--------------------------------------------------------------------------#
+    def Dispose (self):
+        self.provider.Dispose ()
+        self.sack.Dispose ()
+
+    def __enter__ (self):
+        return self
+
+    def __exit__ (self, *error):
+        if error [0] is None:
+            self.provider.Dispose ()
+        self.sack.Dispose ()
+        return False
+
+    #--------------------------------------------------------------------------#
+    # Deprecated                                                               #
+    #--------------------------------------------------------------------------#
     @contextlib.contextmanager
     def Transaction (self):
         """Compatibility with old uDB
@@ -43,15 +65,5 @@ class uDB (BPTree):
         """
         yield
         self.provider.Flush ()
-
-    def Close (self, flush = True):
-        self.provider.Close (self.mode != 'r' and flush)
-
-    def __enter__ (self):
-        return self
-
-    def __exit__ (self, et, eo, tb):
-        self.Close (et is None)
-        return False
 
 # vim: nu ft=python columns=120 :

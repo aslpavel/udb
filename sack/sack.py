@@ -9,7 +9,9 @@ __all__ = ('Sack',)
 # Sack                                                                         #
 #------------------------------------------------------------------------------#
 class Sack (object):
-    def __init__ (self, cell_desc, alloc_desc, order = None):
+    def __init__ (self, cell_desc, alloc_desc, order = None, readonly = None):
+        self.readonly = False if readonly is None else readonly
+
         # allocator
         self.alloc_desc = alloc_desc
         if alloc_desc:
@@ -20,15 +22,36 @@ class Sack (object):
             self.alloc = BuddyAllocator (order)
 
         # cell
-        self.Cell = Cell (self, cell_desc)
+        self.cell = Cell (self, cell_desc)
 
+    #--------------------------------------------------------------------------#
+    # Access Data                                                              #
+    #--------------------------------------------------------------------------#
     def Get (self, desc):
         raise NotImplementedError ('Abstract method')
 
     def Push (self, data, desc = None):
         raise NotImplementedError ('Abstract method')
 
+    #--------------------------------------------------------------------------#
+    # Properties                                                               #
+    #--------------------------------------------------------------------------#
+    @property
+    def Cell (self):
+        return self.cell
+
+    @property
+    def IsReadOnly (self):
+        return self.readonly
+
+    #--------------------------------------------------------------------------#
+    # Flush                                                                    #
+    #--------------------------------------------------------------------------#
     def Flush (self):
+        if self.readonly:
+            raise RuntimeError ('Sack is readonly')
+
+        # flush cells
         self.Cell.Flush ()
 
         # flush allocator
@@ -41,16 +64,18 @@ class Sack (object):
                 break
             self.alloc_desc = desc
 
-    def Close (self, flush = True):
-        if flush:
+    #--------------------------------------------------------------------------#
+    # Dispose                                                                  #
+    #--------------------------------------------------------------------------#
+    def Dispose (self):
+        if not self.readonly:
             self.Flush ()
 
-    # context manager
     def __enter__ (self):
         return self
 
     def __exit__ (self, et, eo, tb):
-        self.Close ()
+        self.Dispose ()
         return False
 
 # vim: nu ft=python columns=120 :

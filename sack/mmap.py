@@ -25,9 +25,11 @@ class MMapSack (StreamSack):
 
         # open file
         prot = mmap.PROT_READ | mmap.PROT_WRITE
+        readonly = False
         is_new = False
         if mode == 'r':
             prot, fd = mmap.PROT_READ, os.open (file, os.O_RDONLY)
+            readonly = True
         elif mode == 'w':
             fd = os.open (file, os.O_RDWR)
         elif mode == 'c':
@@ -42,8 +44,18 @@ class MMapSack (StreamSack):
             os.write (fd, b'\x00' * self.header.size)
         stream = mmap.mmap (fd, 0, mmap.MAP_SHARED, prot)
 
-        StreamSack.__init__ (self, stream, offset, order, is_new)
+        StreamSack.__init__ (self, stream, offset, order, is_new, readonly = readonly)
 
+    #--------------------------------------------------------------------------#
+    # Dispose                                                                  #
+    #--------------------------------------------------------------------------#
+    def Dispose (self):
+        StreamSack.Dispose (self)
+        self.stream.close ()
+
+    #--------------------------------------------------------------------------#
+    # Private                                                                  #
+    #--------------------------------------------------------------------------#
     def resize (self, size):
         if len (self.stream) < size:
             self.stream.resize (size)

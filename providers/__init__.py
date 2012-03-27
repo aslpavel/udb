@@ -5,14 +5,19 @@ __all__ = ('Provider',)
 # B+Tree Provider                                                              #
 #------------------------------------------------------------------------------#
 class Provider (object):
-    # transformation
+
+    #--------------------------------------------------------------------------#
+    # Resolve References                                                       #
+    #--------------------------------------------------------------------------#
     def NodeToDesc (self, node):
         raise NotImplementedError ()
 
     def DescToNode (self, desc):
         raise NotImplementedError ()
 
-    # creation | deletion
+    #--------------------------------------------------------------------------#
+    # Create | Delete                                                          #
+    #--------------------------------------------------------------------------#
     def Dirty (self, node):
         raise NotImplementedError ()
 
@@ -25,7 +30,9 @@ class Provider (object):
     def Flush (self):
         pass
 
-    # properties
+    #--------------------------------------------------------------------------#
+    # Properties                                                               #
+    #--------------------------------------------------------------------------#
     def Size (self, value = None):
         raise NotImplementedError ()
 
@@ -36,18 +43,19 @@ class Provider (object):
         raise NotImplementedError ()
 
     def Order (self):
-        pass
+        raise NotImplementedError ()
 
-    # context
-    def Close (self, flush = True):
-        if flush:
-            self.Flush ()
+    #--------------------------------------------------------------------------#
+    # Dispose                                                                  #
+    #--------------------------------------------------------------------------#
+    def Dispose (self):
+        self.Flush ()
 
     def __enter__ (self):
         return self
 
     def __exit__ (self, et, eo, tb):
-        self.Close ()
+        self.Dispose ()
         return False
 
 # vim: nu ft=python columns=120 :

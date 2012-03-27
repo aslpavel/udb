@@ -18,7 +18,7 @@ class StreamSack (Sack):
         | offset | order |
         +--------+-------+
     """
-    def __init__ (self, stream, offset = 0, order = None, new = False):
+    def __init__ (self, stream, offset = 0, order = None, new = False, readonly = None):
         # headers
         self.data_header = struct.Struct ('!I')
         self.header = struct.Struct ('!QQ')
@@ -28,11 +28,11 @@ class StreamSack (Sack):
         self.data_offset = offset + self.header.size
 
         if new:
-            Sack.__init__ (self, None, None, order)
+            Sack.__init__ (self, None, None, order, readonly = readonly)
         else:
             stream.seek (offset)
             alloc_desc, cell_desc = self.header.unpack (stream.read (self.header.size))
-            Sack.__init__ (self, cell_desc, alloc_desc)
+            Sack.__init__ (self, cell_desc, alloc_desc, readonly = readonly)
 
     def Push (self, data, desc = None):
         """Push data
@@ -100,6 +100,7 @@ class StreamSack (Sack):
 
     def Flush (self):
         Sack.Flush (self)
+
         # flush header
         self.stream.seek (self.offset)
         self.stream.write (self.header.pack (self.alloc_desc, self.Cell.desc))

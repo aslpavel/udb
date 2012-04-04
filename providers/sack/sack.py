@@ -8,7 +8,7 @@ from bisect import bisect
 # local
 from .. import Provider
 
-__all__ = ('SackProvider')
+__all__ = ('SackProvider',)
 #------------------------------------------------------------------------------#
 # B+Tree Sack Provider                                                         #
 #------------------------------------------------------------------------------#

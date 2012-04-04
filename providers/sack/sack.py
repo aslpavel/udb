@@ -18,7 +18,7 @@ class SackProvider (Provider):
     #--------------------------------------------------------------------------#
     FLAG_COMPRESSION = 1
 
-    def __init__ (self, sack, order = None, type = None, cell = 0, flags = 0):
+    def __init__ (self, sack, order = None, type = None, cell = 0, flags = None):
         """Sack Provider
 
         sack  : sack backing store
@@ -62,7 +62,7 @@ class SackProvider (Provider):
 
             # init provider
             self.type_resolve (type)
-            self.flags = flags
+            self.flags = 0 if flags is None else flags
             self.order = order
             self.depth = 1
             self.size  = 0

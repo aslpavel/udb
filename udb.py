@@ -19,7 +19,14 @@ default_cell          = 0
 # Micro Database Interface                                                     #
 #------------------------------------------------------------------------------#
 class uDB (BPTree):
-    def __init__ (self, file, mode = 'r', order = None, cell = None, capacity_order = None, provider_type = None):
+    #--------------------------------------------------------------------------#
+    # Flags                                                                    #
+    #--------------------------------------------------------------------------#
+    FLAG_COMPRESSION = SackProvider.FLAG_COMPRESSION
+
+    def __init__ (self, file, mode = 'r', order = None, cell = None, capacity_order = None,
+            provider_type = None, flags = None):
+
         # init defaults
         provider_type  = default_provider_type if provider_type is None else provider_type
         capacity_order = default_sack_order if capacity_order is None else capacity_order
@@ -30,7 +37,8 @@ class uDB (BPTree):
         self.mode = mode
         self.sack = FileSack (file, mode = mode, order = capacity_order)
 
-        BPTree.__init__ (self, SackProvider (self.sack, order = order, type = provider_type, cell = cell))
+        BPTree.__init__ (self, SackProvider (self.sack, order = order, type = provider_type,
+            cell = cell, flags = flags))
 
     #--------------------------------------------------------------------------#
     # Flush                                                                    #

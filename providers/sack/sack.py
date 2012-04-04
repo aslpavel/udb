@@ -1,19 +1,24 @@
 # -*- coding: utf-8 -*-
 """Sack Provider"""
 import io
-import sys
 import struct
+import zlib
 from bisect import bisect
 
 # local
 from .. import Provider
 
-__all__ = ('SackProvider',)
+__all__ = ('SackProvider')
 #------------------------------------------------------------------------------#
 # B+Tree Sack Provider                                                         #
 #------------------------------------------------------------------------------#
 class SackProvider (Provider):
-    def __init__ (self, sack, order = None, type = None, cell = 0):
+    #--------------------------------------------------------------------------#
+    # Flags                                                                    #
+    #--------------------------------------------------------------------------#
+    FLAG_COMPRESSION = 1
+
+    def __init__ (self, sack, order = None, type = None, cell = 0, flags = 0):
         """Sack Provider
 
         sack  : sack backing store
@@ -27,12 +32,13 @@ class SackProvider (Provider):
 
         # Header:
         #   '2s' type
+        #   'B'  flags
         #   'I'  order
         #   'I'  depth
         #   'Q'  size
         #   'Q'  root descriptor
         ###
-        self.header = struct.Struct ('!2sIIQQ')
+        self.header = struct.Struct ('!2sBIIQQ')
 
         self.d2n = {}
         self.dirty = set ()
@@ -41,7 +47,7 @@ class SackProvider (Provider):
         self.cell = cell
         header = self.sack.Cell [cell]
         if header:
-            type , self.order, self.depth, self.size, root_desc = self.header.unpack_from (header)
+            type , self.flags, self.order, self.depth, self.size, root_desc = self.header.unpack_from (header)
             type = type.decode ('utf-8')
             if self.type and self.type != type:
                 raise ValueError ('Type mismatch requested \'{}\', but found \'{}\''.format (self.type, type))
@@ -56,6 +62,7 @@ class SackProvider (Provider):
 
             # init provider
             self.type_resolve (type)
+            self.flags = flags
             self.order = order
             self.depth = 1
             self.size  = 0
@@ -143,7 +150,10 @@ class SackProvider (Provider):
             leaf.SaveHeader (data)
 
             # put leaf in sack
-            desc = self.sack.Push (data.getvalue (), leaf.desc)
+            if self.flags & self.FLAG_COMPRESSION:
+                desc = self.sack.Push (zlib.compress (data.getvalue ()), leaf.desc)
+            else:
+                desc = self.sack.Push (data.getvalue (), leaf.desc)
             assert leaf.desc == desc
 
         #--------------------------------------------------------------------------#
@@ -169,7 +179,10 @@ class SackProvider (Provider):
             node.Save (data)
 
             # put node in sack
-            desc = self.sack.Push (data.getvalue (), None if node.desc < 0 else node.desc)
+            if self.flags & self.FLAG_COMPRESSION:
+                desc = self.sack.Push (zlib.compress (data.getvalue ()), None if node.desc < 0 else node.desc)
+            else:
+                desc = self.sack.Push (data.getvalue (), None if node.desc < 0 else node.desc)
 
             # check if node has been relocated
             if node.desc != desc:
@@ -203,8 +216,8 @@ class SackProvider (Provider):
         #--------------------------------------------------------------------------#
         # Flush Header                                                             #
         #--------------------------------------------------------------------------#
-        header = self.header.pack (self.type.encode ('utf-8'), self.order, self.depth, self.size, self.root.desc)
-        self.sack.Cell [self.cell] = header
+        self.sack.Cell [self.cell] = self.header.pack (self.type.encode ('utf-8'), self.flags, self.order,
+            self.depth, self.size, self.root.desc)
 
         #--------------------------------------------------------------------------#
         # Flush Sack                                                               #
@@ -265,9 +278,14 @@ class SackProvider (Provider):
     # Private                                                                  #
     #--------------------------------------------------------------------------#
     def node_load (self, desc):
-        data = io.BytesIO (self.sack.Get (desc))
+        if self.flags & self.FLAG_COMPRESSION:
+            data = io.BytesIO (zlib.decompress (self.sack.Get (desc)))
+        else:
+            data = io.BytesIO (self.sack.Get (desc))
+
         node = (self.leaf_type.Load (desc, data) if data.read (1) == b'\x01' else
             self.node_type.Load (desc, data))
+
         self.d2n [desc] = node
         return node
 

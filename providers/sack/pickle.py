@@ -1,5 +1,4 @@
 # -*- coding: utf-8 -*-
-import io
 import sys
 import array
 import struct
@@ -34,8 +33,10 @@ class Node (BPTreeNode):
     #--------------------------------------------------------------------------#
     # Save | Load                                                              #
     #--------------------------------------------------------------------------#
-    def Save (self, stream):
+    def SaveHeader (self, stream):
         stream.write (self.header.pack (len (self.children)))
+
+    def Save (self, stream):
         stream.write (self.children.tostring ())
         pickle.dump (self.keys, stream, pickle_version)
 
@@ -69,12 +70,11 @@ class Leaf (BPTreeLeaf):
     #--------------------------------------------------------------------------#
     # Save | Load                                                              #
     #--------------------------------------------------------------------------#
-    def Save (self, stream):
-        stream.seek (self.header.size, io.SEEK_CUR)
-        pickle.dump ((self.keys, self.children), stream, pickle_version)
-
     def SaveHeader (self, stream):
         stream.write (self.header.pack (self.prev, self.next))
+
+    def Save (self, stream):
+        pickle.dump ((self.keys, self.children), stream, pickle_version)
 
     @classmethod
     def Load (cls, desc, stream):

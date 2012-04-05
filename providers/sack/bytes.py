@@ -1,5 +1,4 @@
 # -*- coding: utf-8 -*-
-import io
 import array
 import struct
 
@@ -39,8 +38,10 @@ class Node (BPTreeNode):
     #--------------------------------------------------------------------------#
     # Save | Load                                                              #
     #--------------------------------------------------------------------------#
-    def Save (self, stream):
+    def SaveHeader (self, stream):
         stream.write (self.header.pack (len (self.children)))
+
+    def Save (self, stream):
         self.keys.Save (stream)
         stream.write (self.children.tostring ())
 
@@ -85,13 +86,12 @@ class Leaf (BPTreeLeaf):
     #--------------------------------------------------------------------------#
     # Save | Load                                                              #
     #--------------------------------------------------------------------------#
-    def Save (self, stream):
-        stream.seek (self.header.size, io.SEEK_CUR)
-        self.keys.Save (stream)
-        self.children.Save (stream)
-
     def SaveHeader (self, stream):
         stream.write (self.header.pack (self.prev, self.next))
+
+    def Save (self, stream):
+        self.keys.Save (stream)
+        self.children.Save (stream)
 
     @classmethod
     def Load (cls, desc, stream):

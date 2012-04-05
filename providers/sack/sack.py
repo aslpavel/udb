@@ -32,13 +32,13 @@ class SackProvider (Provider):
 
         # Header:
         #   '2s' type
-        #   'B'  flags
+        #   'Q'  flags
         #   'I'  order
         #   'I'  depth
         #   'Q'  size
         #   'Q'  root descriptor
         ###
-        self.header = struct.Struct ('!2sBIIQQ')
+        self.header = struct.Struct ('!2sQIIQQ')
 
         self.d2n = {}
         self.dirty = set ()
@@ -81,16 +81,15 @@ class SackProvider (Provider):
         #--------------------------------------------------------------------------#
         leaf_queue = {}
         def leaf_enqueue (leaf):
-            data = io.BytesIO ()
-            data.write (b'\x01') # set node flag
-            leaf.Save (data)
+            body = io.BytesIO ()
+            leaf.Save (body)
+            body = zlib.compress (body.getvalue ()) if self.flags & self.FLAG_COMPRESSION else body.getvalue ()
 
             # enqueue leaf
-            leaf_queue [leaf] = data
+            leaf_queue [leaf] = body
 
             # allocate space
-            desc = self.sack.Reserve (len (zlib.compress (data.getvalue ())) + self.leaf_type.header.size + 1
-                if self.flags & self.FLAG_COMPRESSION else data.tell (), None if leaf.desc < 0 else leaf.desc)
+            desc = self.sack.Reserve (len (body) + leaf.header.size + 1, None if leaf.desc < 0 else leaf.desc)
 
             # check if node has been relocated
             if leaf.desc != desc:
@@ -136,7 +135,7 @@ class SackProvider (Provider):
                 node_queue.add (node)
 
         # all leafs has been allocated now
-        for leaf, data in leaf_queue.items ():
+        for leaf, body in leaf_queue.items ():
             # update prev
             prev = d2n_reloc.get (leaf.prev)
             if prev is not None:
@@ -146,15 +145,14 @@ class SackProvider (Provider):
             if next is not None:
                 leaf.next = next.desc
 
-            # write header
-            data.seek (1)
+            # write leaf data
+            data = io.BytesIO ()
+            data.write (b'\x01') # set leaf flag
             leaf.SaveHeader (data)
+            data.write (body)
 
             # put leaf in sack
-            if self.flags & self.FLAG_COMPRESSION:
-                desc = self.sack.Push (zlib.compress (data.getvalue ()), leaf.desc)
-            else:
-                desc = self.sack.Push (data.getvalue (), leaf.desc)
+            desc = self.sack.Push (data.getvalue (), leaf.desc)
             assert leaf.desc == desc
 
         #--------------------------------------------------------------------------#
@@ -177,13 +175,16 @@ class SackProvider (Provider):
             # save
             data = io.BytesIO ()
             data.write (b'\x00') # unset leaf flag
-            node.Save (data)
+            node.SaveHeader (data)
+            if self.flags & self.FLAG_COMPRESSION:
+                body = io.BytesIO ()
+                node.Save (body)
+                data.write (zlib.compress (body.getvalue ()))
+            else:
+                node.Save (data)
 
             # put node in sack
-            if self.flags & self.FLAG_COMPRESSION:
-                desc = self.sack.Push (zlib.compress (data.getvalue ()), None if node.desc < 0 else node.desc)
-            else:
-                desc = self.sack.Push (data.getvalue (), None if node.desc < 0 else node.desc)
+            desc = self.sack.Push (data.getvalue (), None if node.desc < 0 else node.desc)
 
             # check if node has been relocated
             if node.desc != desc:
@@ -279,13 +280,17 @@ class SackProvider (Provider):
     # Private                                                                  #
     #--------------------------------------------------------------------------#
     def node_load (self, desc):
+        # load data
+        data = io.BytesIO (self.sack.Get (desc))
+        type = self.leaf_type if data.read (1) == b'\x01' else self.node_type
         if self.flags & self.FLAG_COMPRESSION:
-            data = io.BytesIO (zlib.decompress (self.sack.Get (desc)))
+            stream = io.BytesIO ()
+            stream.write (data.read (type.header.size))
+            stream.write (zlib.decompress (data.read ()))
+            stream.seek (0)
+            node = type.Load (desc, stream)
         else:
-            data = io.BytesIO (self.sack.Get (desc))
-
-        node = (self.leaf_type.Load (desc, data) if data.read (1) == b'\x01' else
-            self.node_type.Load (desc, data))
+            node = type.Load (desc, data)
 
         self.d2n [desc] = node
         return node

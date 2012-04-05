@@ -89,7 +89,8 @@ class SackProvider (Provider):
             leaf_queue [leaf] = data
 
             # allocate space
-            desc = self.sack.Reserve (data.tell (), None if leaf.desc < 0 else leaf.desc)
+            desc = self.sack.Reserve (zlib.compress (data.getvalue ()) + self.leaf_type.header.size + 1
+                if self.flags & self.FLAG_COMPRESSION else data.tell (), None if leaf.desc < 0 else leaf.desc)
 
             # check if node has been relocated
             if leaf.desc != desc:

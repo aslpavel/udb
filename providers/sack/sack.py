@@ -49,8 +49,6 @@ class SackProvider (Provider):
         if header:
             type , self.flags, self.order, self.depth, self.size, root_desc = self.header.unpack_from (header)
             type = type.decode ('utf-8')
-            if self.type and self.type != type:
-                raise ValueError ('Type mismatch requested \'{}\', but found \'{}\''.format (self.type, type))
             self.type_resolve (type)
             self.root = self.node_load (root_desc)
         else:

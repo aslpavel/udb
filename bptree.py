@@ -16,6 +16,9 @@ class BPTree (MutableMapping):
     def __init__ (self, provider):
         self.provider = provider
 
+    #--------------------------------------------------------------------------#
+    # Get                                                                      #
+    #--------------------------------------------------------------------------#
     def Get (self, key, default = null):
         # provider
         desc2node = self.provider.DescToNode
@@ -34,6 +37,9 @@ class BPTree (MutableMapping):
 
         return node.children [index]
 
+    #--------------------------------------------------------------------------#
+    # Get Cursor                                                               #
+    #--------------------------------------------------------------------------#
     def GetCursor (self, key):
         desc2node = self.provider.DescToNode
         node = self.provider.Root ()
@@ -42,6 +48,9 @@ class BPTree (MutableMapping):
 
         return BPTreeCursor (self.provider, node, bisect_left (node.keys, key) - 1)
 
+    #--------------------------------------------------------------------------#
+    # Get Range                                                                #
+    #--------------------------------------------------------------------------#
     def GetRange (self, low = None, high = None):
         # validate range
         if low is not None and high is not None and low >= high:
@@ -80,6 +89,9 @@ class BPTree (MutableMapping):
                 return
             yield key, value
 
+    #--------------------------------------------------------------------------#
+    # Add                                                                      #
+    #--------------------------------------------------------------------------#
     def Add (self, key, value):
         # provider
         order = self.provider.Order ()
@@ -150,6 +162,9 @@ class BPTree (MutableMapping):
         self.provider.Root (self.provider.NodeCreate ([key],
             [node2desc (self.provider.Root ()), node2desc (sibling)], False))
 
+    #--------------------------------------------------------------------------#
+    # Pop                                                                      #
+    #--------------------------------------------------------------------------#
     def Pop (self, key, default = null):
         # provider
         half_order = self.provider.Order () >> 1

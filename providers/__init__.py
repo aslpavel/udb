@@ -58,4 +58,17 @@ class Provider (object):
         self.Dispose ()
         return False
 
+    #--------------------------------------------------------------------------#
+    # Iterator                                                                 #
+    #--------------------------------------------------------------------------#
+    def __iter__ (self):
+        stack = [self.Root ()]
+        while stack:
+            node = stack.pop ()
+
+            yield node
+
+            if not node.is_leaf:
+                for desc in node.children:
+                    stack.append (self.DescToNode (desc))
 # vim: nu ft=python columns=120 :

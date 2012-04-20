@@ -10,20 +10,20 @@ __all__ = ('uDB', 'xDB')
 #------------------------------------------------------------------------------#
 default_sack_order    = 32
 default_bptree_order  = 256
-default_provider_type = 'SS'
+default_type          = 'SS'
 default_cell          = 0
 
 #------------------------------------------------------------------------------#
 # Table                                                                        #
 #------------------------------------------------------------------------------#
 class Table (BPTree):
-    def __init__ (self, sack, cell, order = None, provider_type = None, flags = None):
+    def __init__ (self, sack, cell, order = None, type = None, flags = None):
         # init defaults
-        provider_type  = default_provider_type if provider_type is None  else provider_type
-        order          = default_bptree_order  if order is None          else order
+        type  = default_type if type is None else type
+        order = default_bptree_order if order is None else order
 
         # base ctor
-        BPTree.__init__ (self, SackProvider (sack, order, provider_type, cell, flags))
+        BPTree.__init__ (self, SackProvider (sack, order, type, cell, flags))
 
     #--------------------------------------------------------------------------#
     # Flush                                                                    #
@@ -61,7 +61,8 @@ class Table (BPTree):
 #------------------------------------------------------------------------------#
 class uDB (Table):
     def __init__ (self, file, mode = 'r', cell = None, order = None, capacity_order = None,
-        provider_type = None, flags = None):
+        type = None, flags = None):
+
         # init defaults
         capacity_order = default_sack_order if capacity_order is None else capacity_order
         cell = default_cell if cell is None else cell
@@ -70,7 +71,7 @@ class uDB (Table):
         self.sack = FileSack (file, mode, capacity_order)
 
         # base ctor
-        Table.__init__ (self, self.sack, cell, order, provider_type, flags)
+        Table.__init__ (self, self.sack, cell, order, type, flags)
 
     #--------------------------------------------------------------------------#
     # Dispose                                                                  #
@@ -102,10 +103,10 @@ class xDB (object):
     #--------------------------------------------------------------------------#
     # Access                                                                   #
     #--------------------------------------------------------------------------#
-    def Table (self, cell, order = None, provider_type = None, flags = None):
+    def Table (self, cell, order = None, type = None, flags = None):
         table = self.tables.get (cell)
         if table is None:
-            table = Table (self.sack, cell, order, provider_type, flags)
+            table = Table (self.sack, cell, order, type, flags)
             self.tables [cell] = table
         return table
 

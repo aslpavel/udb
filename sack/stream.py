@@ -34,6 +34,9 @@ class StreamSack (Sack):
             alloc_desc, cell_desc = self.header.unpack (stream.read (self.header.size))
             Sack.__init__ (self, cell_desc, alloc_desc, readonly = readonly)
 
+    #--------------------------------------------------------------------------#
+    # Access Data                                                              #
+    #--------------------------------------------------------------------------#
     def Push (self, data, desc = None):
         """Push data
 
@@ -98,6 +101,9 @@ class StreamSack (Sack):
         self.alloc.Free (offset, order)
         return self.stream.read (self.data_header.unpack (self.stream.read (self.data_header.size)) [0])
 
+    #--------------------------------------------------------------------------#
+    # Flush                                                                    #
+    #--------------------------------------------------------------------------#
     def Flush (self):
         Sack.Flush (self)
 

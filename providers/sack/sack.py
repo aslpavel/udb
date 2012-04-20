@@ -8,16 +8,16 @@ from bisect import bisect
 # local
 from .. import Provider
 
-__all__ = ('SackProvider',)
+__all__ = ('SackProvider', 'FLAG_COMPRESSION')
+#------------------------------------------------------------------------------#
+# Flags                                                                        #
+#------------------------------------------------------------------------------#
+FLAG_COMPRESSION = 1
+
 #------------------------------------------------------------------------------#
 # B+Tree Sack Provider                                                         #
 #------------------------------------------------------------------------------#
 class SackProvider (Provider):
-    #--------------------------------------------------------------------------#
-    # Flags                                                                    #
-    #--------------------------------------------------------------------------#
-    FLAG_COMPRESSION = 1
-
     def __init__ (self, sack, order = None, type = None, cell = 0, flags = None):
         """Sack Provider
 
@@ -81,7 +81,7 @@ class SackProvider (Provider):
         def leaf_enqueue (leaf):
             body = io.BytesIO ()
             leaf.Save (body)
-            body = zlib.compress (body.getvalue ()) if self.flags & self.FLAG_COMPRESSION else body.getvalue ()
+            body = zlib.compress (body.getvalue ()) if self.flags & FLAG_COMPRESSION else body.getvalue ()
 
             # enqueue leaf
             leaf_queue [leaf] = body
@@ -174,7 +174,7 @@ class SackProvider (Provider):
             data = io.BytesIO ()
             data.write (b'\x00') # unset leaf flag
             node.SaveHeader (data)
-            if self.flags & self.FLAG_COMPRESSION:
+            if self.flags & FLAG_COMPRESSION:
                 body = io.BytesIO ()
                 node.Save (body)
                 data.write (zlib.compress (body.getvalue ()))
@@ -281,7 +281,7 @@ class SackProvider (Provider):
         # load data
         data = io.BytesIO (self.sack.Get (desc))
         type = self.leaf_type if data.read (1) == b'\x01' else self.node_type
-        if self.flags & self.FLAG_COMPRESSION:
+        if self.flags & FLAG_COMPRESSION:
             stream = io.BytesIO ()
             stream.write (data.read (type.header.size))
             stream.write (zlib.decompress (data.read ()))

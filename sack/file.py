@@ -18,7 +18,7 @@ class FileSack (StreamSack):
         'c' : Open existing sack for reading and writing, create if it doesn't exists
         'n' : Always create a new sack
     """
-    def __init__ (self, file, mode = 'r', offset = 0, order = None):
+    def __init__ (self, file, mode = 'r', order = None, offset = 0):
         self.mode = mode
         if mode in ('c', 'n') and order is None:
             raise ValueError ('order must be provided for \'c\' and \'n\' modes')

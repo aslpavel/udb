@@ -27,10 +27,16 @@ class Sack (object):
     #--------------------------------------------------------------------------#
     # Access Data                                                              #
     #--------------------------------------------------------------------------#
+    def Push (self, data, desc = None):
+        raise NotImplementedError ('Abstract method')
+
+    def Reserve (self, data, desc = None):
+        raise NotImplementedError ('Abstract method')
+
     def Get (self, desc):
         raise NotImplementedError ('Abstract method')
 
-    def Push (self, data, desc = None):
+    def Pop (self, desc):
         raise NotImplementedError ('Abstract method')
 
     #--------------------------------------------------------------------------#

@@ -80,7 +80,7 @@ class uDB (Table):
         Table.Dispose (self)
         self.sack.Dispose ()
 
-    def __exit__ (self, *error):
+    def __exit__ (self, et, eo, tb):
         Table.__exit__ (self, et, eo, tb)
         self.sack.Dispose ()
         return False

@@ -52,7 +52,7 @@ class Table (BPTree):
         return self
 
     def __exit__ (self, et, eo, tb):
-        if error [0] is None:
+        if et is None:
             self.provider.Dispose ()
         return False
 

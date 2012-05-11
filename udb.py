@@ -35,7 +35,7 @@ class Table (BPTree):
     # Drop                                                                     #
     #--------------------------------------------------------------------------#
     def Drop (self):
-        self.provider.sack.WriteLock:
+        with self.provider.sack.WriteLock:
             self.provider.Flush ()
             for node in list (self.provider):
                 self.provider.sack.Pop (node.desc)

@@ -1,8 +1,11 @@
 # -*- coding: utf-8 -*-
 import io
+
 from .alloc import *
 from .cell import *
+
 from ..utils import *
+from ..lock import *
 
 __all__ = ('Sack',)
 #------------------------------------------------------------------------------#
@@ -11,6 +14,7 @@ __all__ = ('Sack',)
 class Sack (object):
     def __init__ (self, cell_desc, alloc_desc, order = None, readonly = None):
         self.readonly = False if readonly is None else readonly
+        self.lock = DummyLock ()
 
         # allocator
         self.alloc_desc = alloc_desc
@@ -54,21 +58,33 @@ class Sack (object):
     # Flush                                                                    #
     #--------------------------------------------------------------------------#
     def Flush (self):
-        if self.readonly:
-            raise RuntimeError ('Sack is readonly')
+        with self.WriteLock:
+            if self.readonly:
+                raise RuntimeError ('Sack is readonly')
 
-        # flush cells
-        self.Cell.Flush ()
+            # flush cells
+            self.Cell.Flush ()
 
-        # flush allocator
-        while True:
-            state = io.BytesIO ()
-            self.alloc.Save (state)
-            desc = self.Push (state.getvalue (), self.alloc_desc)
-            if desc == self.alloc_desc:
+            # flush allocator
+            while True:
+                state = io.BytesIO ()
+                self.alloc.Save (state)
+                desc = self.Push (state.getvalue (), self.alloc_desc)
+                if desc == self.alloc_desc:
+                    self.alloc_desc = desc
+                    break
                 self.alloc_desc = desc
-                break
-            self.alloc_desc = desc
+
+    #--------------------------------------------------------------------------#
+    # Locking                                                                  #
+    #--------------------------------------------------------------------------#
+    @property
+    def ReadLock (self):
+        return self.lock
+
+    @property
+    def WriteLock (self):
+        return self.lock
 
     #--------------------------------------------------------------------------#
     # Dispose                                                                  #

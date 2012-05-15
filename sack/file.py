@@ -25,16 +25,11 @@ class FileSack (StreamSack):
         if mode in ('c', 'n') and order is None:
             raise ValueError ('order must be provided for \'c\' and \'n\' modes')
 
-        # reading only
         if mode == 'r':
             StreamSack.__init__ (self, self.lock_init (open (file, 'rb', buffering = buffer_size)),
                     offset, readonly = True)
-
-        # reading and writing
         elif mode == 'w':
             StreamSack.__init__ (self, self.lock_init (open (file, 'r+b', buffering = buffer_size)), offset)
-
-        # reading and writing, create if it doesn't exists
         elif mode == 'c':
             if not os.path.lexists (file):
                 StreamSack.__init__ (self, self.lock_init (open (file, 'w+b', buffering = buffer_size)),
@@ -42,13 +37,10 @@ class FileSack (StreamSack):
                 self.Flush ()
             else:
                 StreamSack.__init__ (self, self.lock_init (open (file, 'r+b', buffering = buffer_size)), offset)
-
-        # create a new
         elif mode == 'n':
             StreamSack.__init__ (self, self.lock_init (open (file, 'w+b', buffering = buffer_size)),
                 offset, new = True, order = order)
             self.Flush ()
-
         else:
             raise ValueError ('Unsupported self.lock_init (open mode')
 

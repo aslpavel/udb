@@ -30,9 +30,8 @@ class StreamSack (Sack):
         if new:
             Sack.__init__ (self, None, None, order, readonly = readonly)
         else:
-            with self.ReadLock:
-                stream.seek (offset)
-                alloc_desc, cell_desc = self.header.unpack (stream.read (self.header.size))
+            stream.seek (offset)
+            alloc_desc, cell_desc = self.header.unpack (stream.read (self.header.size))
             Sack.__init__ (self, cell_desc, alloc_desc, readonly = readonly)
 
     #--------------------------------------------------------------------------#
@@ -45,28 +44,27 @@ class StreamSack (Sack):
         desc: data's previous descriptor if any
         returns: new data's descriptor
         """
-        with self.WriteLock:
-            # try to save in previous location
-            if desc is not None:
-                if len (data) + self.data_header.size  <= 1 << (desc & 0xff): # desc.capacity
-                    self.stream.seek (self.data_offset + (desc >> 8)) # desc.offset
-                    self.stream.write (self.data_header.pack (len (data)))
-                    self.stream.write (data)
-                    return desc
-                self.alloc.Free (desc >> 8, desc & 0xff) # desc.offset, desc.order
-
-            # allocate new block
-            offset, order = self.alloc.Alloc (len (data) + self.data_header.size)
-            self.resize (self.data_offset + offset + (1 << order))
-            try:
-                self.stream.seek (self.data_offset + offset)
+        # try to save in previous location
+        if desc is not None:
+            if len (data) + self.data_header.size  <= 1 << (desc & 0xff): # desc.capacity
+                self.stream.seek (self.data_offset + (desc >> 8)) # desc.offset
                 self.stream.write (self.data_header.pack (len (data)))
                 self.stream.write (data)
+                return desc
+            self.alloc.Free (desc >> 8, desc & 0xff) # desc.offset, desc.order
 
-                return order | offset << 8 # desc
-            except Exception:
-                self.alloc.Free (offset, order)
-                raise
+        # allocate new block
+        offset, order = self.alloc.Alloc (len (data) + self.data_header.size)
+        self.resize (self.data_offset + offset + (1 << order))
+        try:
+            self.stream.seek (self.data_offset + offset)
+            self.stream.write (self.data_header.pack (len (data)))
+            self.stream.write (data)
+
+            return order | offset << 8 # desc
+        except Exception:
+            self.alloc.Free (offset, order)
+            raise
 
     def Reserve (self, size, desc = None):
         """Allocate block without writing anything
@@ -89,9 +87,8 @@ class StreamSack (Sack):
         desc: data's descriptor
         returns: data
         """
-        with self.ReadLock:
-            self.stream.seek (self.data_offset + (desc >> 8)) # desc.offset
-            return self.stream.read (self.data_header.unpack (self.stream.read (self.data_header.size)) [0])
+        self.stream.seek (self.data_offset + (desc >> 8)) # desc.offset
+        return self.stream.read (self.data_header.unpack (self.stream.read (self.data_header.size)) [0])
 
     def Pop (self, desc):
         """Pop data
@@ -99,23 +96,21 @@ class StreamSack (Sack):
         desc: data's descriptor
         returns: data
         """
-        with self.WriteLock:
-            offset, order = desc >> 8, desc & 0xff
-            self.stream.seek (self.data_offset + offset)
-            self.alloc.Free (offset, order)
-            return self.stream.read (self.data_header.unpack (self.stream.read (self.data_header.size)) [0])
+        offset, order = desc >> 8, desc & 0xff
+        self.stream.seek (self.data_offset + offset)
+        self.alloc.Free (offset, order)
+        return self.stream.read (self.data_header.unpack (self.stream.read (self.data_header.size)) [0])
 
     #--------------------------------------------------------------------------#
     # Flush                                                                    #
     #--------------------------------------------------------------------------#
     def Flush (self):
-        with self.WriteLock:
-            Sack.Flush (self)
+        Sack.Flush (self)
 
-            # flush header
-            self.stream.seek (self.offset)
-            self.stream.write (self.header.pack (self.alloc_desc, self.Cell.desc))
-            self.stream.flush ()
+        # flush header
+        self.stream.seek (self.offset)
+        self.stream.write (self.header.pack (self.alloc_desc, self.Cell.desc))
+        self.stream.flush ()
 
     #--------------------------------------------------------------------------#
     # private                                                                  #

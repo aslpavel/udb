@@ -15,7 +15,7 @@ class Sack (object):
         # allocator
         self.alloc_desc = alloc_desc
         if alloc_desc:
-            self.alloc = BuddyAllocator.Restore (io.BytesIO (self.Get (self.alloc_desc)))
+            self.alloc = BuddyAllocator.Load (io.BytesIO (self.Get (self.alloc_desc)))
         else:
             if order is None:
                 raise ValueError ('Order is required when creating new sack')

@@ -7,7 +7,10 @@ if sys.version_info [0] < 3:
 else:
     import pickle
 
+from ...utils import *
 from ...bptree import *
+
+__all__ = ('Node', 'Leaf',)
 #------------------------------------------------------------------------------#
 # Node                                                                         #
 #------------------------------------------------------------------------------#
@@ -37,14 +40,13 @@ class Node (BPTreeNode):
         stream.write (self.header.pack (len (self.children)))
 
     def Save (self, stream):
-        stream.write (self.children.tostring ())
+        ArraySave (stream, self.children)
         pickle.dump (self.keys, stream, pickle_version)
 
     @classmethod
     def Load (cls, desc, stream):
-        count = cls.header.unpack (stream.read (cls.header.size)) [0]
-        children = array.array (cls.array_type)
-        children.fromstring (stream.read (count * children.itemsize))
+        count    = cls.header.unpack (stream.read (cls.header.size)) [0]
+        children = ArrayLoad (stream, cls.array_type, count)
 
         return cls (pickle.load (stream), children, desc)
 

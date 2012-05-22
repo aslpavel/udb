@@ -2,9 +2,10 @@
 import array
 import struct
 
-from ...utils import BytesList
+from ...utils import *
 from ...bptree import *
 
+__all__ = ('None', 'Leaf',)
 #------------------------------------------------------------------------------#
 # Node                                                                         #
 #------------------------------------------------------------------------------#
@@ -43,14 +44,13 @@ class Node (BPTreeNode):
 
     def Save (self, stream):
         self.keys.Save (stream)
-        stream.write (self.children.tostring ())
+        ArraySave (stream, self.children)
 
     @classmethod
     def Load (cls, desc, stream):
-        count = cls.header.unpack (stream.read (cls.header.size)) [0]
-        keys = BytesList.Load (stream)
-        children = array.array (cls.array_type)
-        children.fromstring (stream.read (children.itemsize * count))
+        count    = cls.header.unpack (stream.read (cls.header.size)) [0]
+        keys     = BytesList.Load (stream)
+        children = ArrayLoad (stream, cls.array_type, count)
 
         return cls (keys, children, desc)
 

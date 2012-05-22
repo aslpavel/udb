@@ -1,11 +1,12 @@
 # -*- coding: utf-8 -*-
 import struct
 
+from ..utils import ArraySave, ArrayLoad
+
 from array import array
 from bisect import insort, bisect_left
 
 __all__ = ('BuddyAllocator', 'AllocatorError')
-
 #------------------------------------------------------------------------------#
 # Buddy Allocator                                                              #
 #------------------------------------------------------------------------------#
@@ -103,27 +104,20 @@ class BuddyAllocator (object):
         return True
 
     #--------------------------------------------------------------------------#
-    # Save and Restore                                                         #
+    # Save | Load                                                              #
     #--------------------------------------------------------------------------#
     def Save (self, stream):
         """Save allocator state to stream"""
         stream.write (struct.pack ('B', self.order))
-        stream.write (array ('I', (len (map) for map in self.map)).tostring ())
+        ArraySave (stream, array ('I', (len (map) for map in self.map)))
         for map in self.map:
-            stream.write (map.tostring ())
+            ArraySave (stream, map)
 
-    @staticmethod
-    def Restore (stream):
-        """Restore allocator state from stream"""
+    @classmethod
+    def Load (cls, stream):
+        """Load allocator state from stream"""
         order = struct.unpack ('B', stream.read (struct.calcsize ('B'))) [0]
-
-        sizes = array ('I')
-        sizes.fromstring (stream.read (sizes.itemsize * (order + 1)))
-
-        map = [array ('L') for k in range (order + 1)]
-        itemsize = map [0].itemsize
-        for k, size in enumerate (sizes):
-            map [k].fromstring (stream.read (size * itemsize))
+        map   = [ArrayLoad (stream, 'L', size) for size in ArrayLoad (stream, 'I', order + 1)]
 
         return BuddyAllocator (order, map)
 

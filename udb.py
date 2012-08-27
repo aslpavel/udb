@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
-from .bptree import *
-from .sack.file import *
-from .providers import *
-from .providers.sack import *
+from .bptree import BPTree
+from .sack.file import FileSack
+from .providers import Provider
+from .providers.sack import SackProvider
 
 __all__ = ('uDB', 'xDB')
 #------------------------------------------------------------------------------#

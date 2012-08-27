@@ -3,10 +3,10 @@ from __future__ import print_function
 import io
 import unittest
 
-from .bptree import *
-from .sack.stream import *
-from .providers.simple import *
-from .providers.sack import *
+from .bptree import BPTree
+from .sack.stream import StreamSack
+from .providers.simple import SimpleProvider
+from .providers.sack import SackProvider
 
 from random import shuffle
 #------------------------------------------------------------------------------#

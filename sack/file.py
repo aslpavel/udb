@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 import os
-from .stream import *
-from .alloc import *
+
+from .stream import StreamSack
 
 __all__ = ('FileSack',)
 default_buffer_size = 1 << 16 # 64Kb

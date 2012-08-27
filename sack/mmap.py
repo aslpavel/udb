@@ -3,7 +3,7 @@ import os
 import mmap
 import struct
 
-from .stream import *
+from .stream import StreamSack
 
 __all__ = ('MMapSack',)
 #------------------------------------------------------------------------------#

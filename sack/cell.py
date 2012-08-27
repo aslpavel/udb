@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 import io
-from ..utils import *
+
+from ..utils import BytesList
 
 __all__ = ('Cell',)
 #------------------------------------------------------------------------------#

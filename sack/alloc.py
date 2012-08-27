@@ -1,10 +1,9 @@
 # -*- coding: utf-8 -*-
 import struct
+from array  import array
+from bisect import insort, bisect_left
 
 from ..utils import ArraySave, ArrayLoad
-
-from array import array
-from bisect import insort, bisect_left
 
 __all__ = ('BuddyAllocator', 'AllocatorError')
 #------------------------------------------------------------------------------#

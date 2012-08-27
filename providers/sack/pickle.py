@@ -7,8 +7,8 @@ if sys.version_info [0] < 3:
 else:
     import pickle
 
-from ...utils import *
-from ...bptree import *
+from ...utils  import ArraySave, ArrayLoad
+from ...bptree import BPTreeNode, BPTreeLeaf
 
 __all__ = ('Node', 'Leaf',)
 #------------------------------------------------------------------------------#

@@ -1,8 +1,7 @@
 # -*- coding: utf-8 -*-
 import io
-from .alloc import *
-from .cell import *
-from ..utils import *
+from .alloc import BuddyAllocator
+from .cell  import Cell
 
 __all__ = ('Sack',)
 #------------------------------------------------------------------------------#

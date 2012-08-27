@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 import struct
 
-from .sack import *
+from .sack import Sack
 
 __all__ = ('StreamSack',)
 #------------------------------------------------------------------------------#

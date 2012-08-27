@@ -1,8 +1,9 @@
 # -*- coding: utf-8 -*-
 import sys
-from bisect import bisect, bisect_left
+from bisect      import bisect, bisect_left
 from collections import MutableMapping
-from operator import itemgetter
+from operator    import itemgetter
+
 if sys.version_info [0] < 3:
     from itertools import imap as map
 

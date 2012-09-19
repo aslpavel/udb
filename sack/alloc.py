@@ -96,9 +96,8 @@ class BuddyAllocator (object):
     def IsAddressUsed (self, address):
         """Check if given address is used"""
         for order, map in enumerate (self.map):
-            size = 1 << order
-            for chunk in map:
-                if chunk <= address < chunk + size:
+            for offset in map:
+                if offset <= address < offset + (1 << order):
                     return False
         return True
 
